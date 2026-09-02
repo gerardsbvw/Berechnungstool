@@ -1,0 +1,3656 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  Musterberechnung Denkmalimmobilie  –  Dr. Piorkowski, Nürnberg WE 114
+  1:1-Umsetzung der Excel-/PDF-Vorlage als HTML.
+
+  EINBINDUNG AUF DER WEBSITE
+  --------------------------
+  Entweder die ganze Datei verwenden oder nur den <style>-Block und den
+  <div class="ib-doc"> … </div> in die eigene Seite kopieren.
+  Alle CSS-Klassen sind mit "ib-" gepraefixt, es gibt keine externen
+  Abhaengigkeiten (kein Framework, keine Web-Fonts, kein Bild).
+
+  SCHRIFTART AENDERN
+  ------------------
+  Nur eine Stelle: die Variable --ib-font in der Regel .ib-doc {…} weiter
+  unten. Groessen ueber --ib-fs / --ib-fs-sm / --ib-fs-note.
+
+  DARSTELLUNG
+  -----------
+  Desktop  : drei DIN-A4-Blaetter wie im PDF-Betrachter
+             (Seite 1 hoch, Seite 2 quer, Seite 3 hoch) auf grauer Flaeche.
+             Jedes Blatt wird per JS auf die verfuegbare Breite verkleinert,
+             nie vergroessert. Farbe der Flaeche: --ib-buehne.
+  < 820 px : kein Blattmodus, gestapeltes Layout; Abschnitt 2 wird
+             horizontal wischbar, die Zeilenbeschriftung bleibt stehen.
+
+  ABSTAENDE
+  ---------
+  --ib-luft skaliert alle Zeilenabstaende gleichmaessig.
+  1 = exakt wie die PDF-Vorlage, aktuell 1.15 (15 % mehr Luft).
+  Achtung: bei Werten ueber 1.2 passt Seite 1 nicht mehr auf ein A4-Blatt.
+
+  FORMELN
+  -------
+  Die Formeln liegen hinter den ⓘ-Symbolen (Klasse .ib-info). Titel, Formel
+  und Klartext stehen in den data-Attributen t / f / k am jeweiligen Button.
+
+  WERKZEUGE
+  ---------
+  Werkzeugleiste ueber den Blaettern: Drucken/PDF, Zuruecksetzen,
+  Hinweise erneut anzeigen. Beim Drucken wird sie ausgeblendet.
+
+  DRUCKEN
+  -------
+  Ergibt genau drei A4-Seiten (hoch / quer / hoch). Wichtig: die Mobil-
+  Regeln stehen unter @media SCREEN, sonst wuerde beim Drucken das
+  gestapelte Layout greifen.
+
+  EINSTIEGSHINWEISE
+  -----------------
+  Vier gefuehrte Schritte, die bei JEDEM Aufruf sofort erscheinen.
+  Umstellen auf "nur beim ersten Besuch": im Script IMMER_ZEIGEN auf
+  false setzen. Texte und Ziele stehen im Array SCHRITTE. Ein Schritt mit
+  alleFelder:true laesst waehrenddessen alle blauen Eingabefelder pulsieren.
+
+  ERKLAERVIDEO
+  ------------
+  Verschiebbares Fenster unten rechts, Knopf "Erklaervideo" in der
+  Werkzeugleiste. Aktuell nur ein Platzhalter – im Markup bei
+  "ERKLAERVIDEO" steht der fertige Beispielcode zum Einsetzen eines
+  eigenen MP4 oder eines eingebetteten Videos.
+  Format ueber --ib-video-format (Vorgabe 16/9 quer), Breite ueber
+  --ib-video-breite. Geschlossen bleibt es dauerhaft geschlossen
+  (localStorage-Schluessel 'ib-video-zu').
+
+  RECHENLOGIK EINHAENGEN
+  ----------------------
+  Die Funktion window.ibBerechnen() wird automatisch aufgerufen, sobald ein
+  Eingabefeld geaendert oder verlassen wird. Dort die Formeln einsetzen.
+  Hilfsfunktionen: ibZahl(element) liest deutsche Zahlen, ibEuro(zahl)
+  formatiert zurueck. Solange die Felder noch reine Anzeigefelder (div) sind,
+  greift nur der Wechsel von Projekt und Einheit; sobald daraus <input>
+  werden, laeuft alles ohne weitere Aenderung.
+  Die Umschaltung erfolgt ueber @media UND @container – der Block passt
+  sich also auch an, wenn er in einer schmalen Spalte steht.
+
+  DATENFELDER
+  -----------
+  Jedes Wertfeld hat eine eigene ID (z. B. #ib-kaufpreis-einheit,
+  #ib-z6, #ib-kpi-ekr), damit spaeter Rechenlogik ergaenzt werden kann.
+  ============================================================================
+-->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Musterberechnung Denkmalimmobilie – Dr. Piorkowski, Nürnberg WE 114</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&family=Inconsolata:wght@400;500;600;700&display=swap');
+/* =========================================================================
+   MUSTERBERECHNUNG DENKMALIMMOBILIE  –  Layout 1:1 nach Excel-/PDF-Vorlage
+   Alle Klassen sind mit "ib-" gepraefixt (ib = ImmobilienBerechnung),
+   damit nichts mit dem restlichen CSS der Website kollidiert.
+   =========================================================================
+   SCHRIFTART SPAETER HIER TAUSCHEN  ->  --ib-font
+   ========================================================================= */
+
+.ib-doc{
+  /* ---- Schrift ---------------------------------------------------- */
+  /* Aktive Schrift. Zum Zurueckdrehen auf den vorherigen Stand einfach die
+     beiden Zeilen tauschen – sonst ist nichts zu aendern.                */
+  --ib-font: "Inter Tight", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+/*--ib-font: Calibri, Carlito, "Segoe UI", system-ui, -apple-system, Arial, sans-serif;*/
+
+  /* Schrift der INHALTE: Beschriftungen, Zeilentexte und alle Zahlen.
+     Die Ueberschriften (blaue Balken, "Allgemeine Daten", "Kaufpreis" …)
+     laufen weiterhin in --ib-font.
+     Zum Zurueckdrehen einfach die beiden Zeilen tauschen – sonst ist
+     nichts zu aendern; dann laeuft wieder alles in der Textschrift. */
+  --ib-font-num: "Inconsolata", ui-monospace, "SF Mono", Consolas, "Liberation Mono", monospace;
+/*--ib-font-num: var(--ib-font);*/
+  /* Feinjustierung: Inconsolata baut optisch etwas kleiner als Inter Tight.
+     1 = exakt gleiche Schriftgroesse (Vorgabe). 1.04 gleicht den optischen
+     Unterschied aus, ohne die Feldbreiten zu sprengen. */
+  --ib-num-scale: 1;
+
+  /* Staerke der Feldrahmen. Zum Zurueckdrehen auf die PDF-Vorlage
+     einfach die beiden Zeilen tauschen. */
+  --ib-rahmen: 0.5pt;
+/*--ib-rahmen: 0.75pt;*/  /* Wert der PDF-Vorlage */
+/*--ib-rahmen: 1.5pt;*/
+  /* Kaestchen und Auswahlkreise: eigener Wert, damit die kleinen
+     Bedienelemente bei sehr feinen Feldrahmen sichtbar bleiben. */
+  --ib-rahmen-klein: 0.75pt;
+
+  /* Grundschriftgroesse. Groesser als die PDF-Vorlage (10pt), damit der
+     Text auch fuer Leser ab 40 bequem lesbar ist.
+     Zum Zurueckdrehen alle drei Zeilenpaare tauschen. */
+  --ib-fs: 11pt;
+/*--ib-fs: 10pt;*/
+  --ib-fs-sm: 9.5pt;      /*  Vorlage: 8.7pt  */
+  --ib-fs-note: 8.8pt;    /*  Vorlage: 8pt    */
+
+  /* ---- Farben (exakt aus dem PDF ausgelesen) ----------------------- */
+  --ib-blue:      #4472C4;  /* blaue Linien und Tabellenakzente        */
+  /* Farbe der Abschnittsbalken (Immobilie, Kundendaten, Finanzierung …).
+     Zum Zurueckdrehen die beiden Zeilen tauschen. */
+  --ib-balken:    #5E88A3;
+/*--ib-balken:    #8FB2C9;*/
+/*--ib-balken:    #4472C4;*/  /* Wert der PDF-Vorlage */
+  /* Schriftfarbe auf den Balken. Weiss auf dem hellen Blau ist zart;
+     fuer mehr Kontrast die beiden Zeilen tauschen. */
+  --ib-balken-txt: #fff;
+/*--ib-balken-txt: #1F3A4D;*/
+  /* Bedienelemente ausserhalb der Blaetter (Werkzeugleiste, Hinweise,
+     Videofenster) greifen dieselbe Farbfamilie auf. */
+  --ib-ui-dunkel: #2C4A5C;   /* Panelgrund Hinweise / Video          */
+  --ib-ui-hell:   #A9C6D8;   /* Sekundaertext auf dunklem Grund      */
+  /* Hoehe der Abschnittsbalken und Einzug ihrer Beschriftung.
+     Vorlagewerte: 13pt / 18.2pt Hoehe, 1.08pt / 1.8pt Einzug. */
+  --ib-balken-h:  17pt;
+  --ib-balken-h3: 22pt;
+  --ib-balken-einzug: 6pt;
+  --ib-blue-dk:   #305496;  /* Balken-/Spaltenbeschriftung Tabelle     */
+  /* Fuellung der Eingabefelder und der hellen Baender (GUV Rechnung,
+     Steuerberechnung monatlich). Zum Zurueckdrehen Zeilen tauschen. */
+  --ib-fill:      #D6E4EC;
+/*--ib-fill:      #D9E1F2;*/
+  --ib-fill-lt:   #DDEBF7;  /* Ergebnisfeld hellblau                   */
+  --ib-grey-lt:   #F7F7F7;  /* Ausgabefeld hellgrau                    */
+  --ib-grey-md:   #F2F2F2;  /* Ergebnisband grau                       */
+  --ib-grey-dk:   #D0CECE;  /* hervorgehobenes Feld grau               */
+  --ib-green:     #C6E0B4;  /* Ueberschussfeld gruen                   */
+  /* Farbe der Feldrahmen. Zum Zurueckdrehen die beiden Zeilen tauschen. */
+  --ib-border:    #000000;  /* Feldrahmen                              */
+/*--ib-border:    #7F7F7F;*/
+  --ib-txt:       #000000;
+  --ib-txt-in:    #3F3F76;  /* Zahlen-/Eingabefarbe (dunkelblau)       */
+  --ib-red:       #FF0000;
+
+  --ib-buehne:    #53565a;  /* Flaeche hinter den A4-Blaettern         */
+
+  /* ---- Raster ----------------------------------------------------------
+     --ib-luft lockert alle Zeilenabstaende gleichmaessig auf.
+     1 = exakt wie die PDF-Vorlage, 1.1 = 10 % mehr Luft.               */
+  --ib-luft: 1.15;
+  --ib-row: calc(16.92pt * var(--ib-luft));   /* Zeilenhoehe Abschnitt 1 */
+  /* Feldhoehe. Groesser als in der PDF-Vorlage, damit die Zahl mehr
+     Luft nach oben und unten hat. Zum Zurueckdrehen Zeilen tauschen. */
+  --ib-box-h: 14.8pt;
+/*--ib-box-h: 12.4pt;*/
+
+  --ib-lbl-w:  169.4pt;     /* Beschriftungsspalte links               */
+  --ib-val-w:   62.9pt;     /* Wertfeld links                          */
+  --ib-pct-w:   36.9pt;     /* Prozentfeld links                       */
+  --ib-lbl2-w: 153.03pt;    /* Beschriftungsspalte rechts              */
+  --ib-val2-w:  60pt;       /* Wertfeld rechts                         */
+  --ib-pct2-w:  49.9pt;     /* Prozentfeld rechts                      */
+
+  --ib-year-w:  51.5pt;       /* Spaltenbreite Jahr (Abschnitt 2)        */
+  --ib-rowlbl-w: 172pt;   /* Zeilenbeschriftung (Abschnitt 2)        */
+                            /* etwas breiter als in der PDF-Vorlage,
+                               weil die dicktengleiche Schrift mehr Platz
+                               braucht – "4) AfA Altsubst.+Stellpl.+Möbel"
+                               ist die laengste Zeile.                    */
+  --ib-row2:    calc(16.3pt * var(--ib-luft));    /* Zeilenhoehe Abschnitt 2                 */
+
+  container-type: inline-size;
+  container-name: ib;
+  font-family: var(--ib-font);
+  font-size: var(--ib-fs);
+  line-height: 1.18;
+  color: var(--ib-txt);
+  font-variant-numeric: tabular-nums;
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  background: #fff;
+  box-sizing: border-box;
+}
+.ib-doc *,
+.ib-doc *::before,
+.ib-doc *::after{ box-sizing: border-box; }
+
+.ib-doc :where(p, div, span, table, td, th, tr, svg, section){
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+/* =========================================================================
+   WERKZEUGLEISTE
+   ========================================================================= */
+.ib-werkzeuge{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 16px;
+  background: var(--ib-fill);
+  border-bottom: 1.5px solid var(--ib-balken);
+  font-size: 14px;
+}
+.ib-btn{                                 /* wie ein Eingabefeld gebaut   */
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border: 1px solid #000;
+  border-radius: 0;
+  background: #fff;
+  color: #1f2430;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color .12s, color .12s;
+}
+/* Hover nur mit echtem Mauszeiger – auf Touchgeraeten bliebe er sonst
+   nach dem Antippen haengen und der Knopf sieht dauerhaft anders aus. */
+@media (hover: hover) and (pointer: fine){
+  .ib-btn:hover{ background: var(--ib-balken); border-color: var(--ib-balken); color: #fff; }
+  .ib-btn--haupt:hover{ background: var(--ib-ui-dunkel); border-color: #000; color: #fff; }
+  .ib-tour-btn:hover{ background: #fff; }
+}
+.ib-btn:focus-visible{ outline: 2px solid var(--ib-balken); outline-offset: 1px; }
+.ib-btn--haupt{
+  background: var(--ib-balken);
+  border-color: #000;
+  color: #fff;
+  font-weight: 600;
+}
+.ib-status{
+  color: var(--ib-ui-dunkel);
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity .18s;
+}
+.ib-status.ib-status--an{ opacity: 1; }
+
+/* =========================================================================
+   EINSTIEGSHINWEISE (gefuehrt, vier Schritte)
+   ========================================================================= */
+.ib-tour{
+  position: fixed;
+  z-index: 10000;
+  width: 330px;
+  max-width: calc(100vw - 24px);
+  padding: 13px 16px 14px;
+  background: var(--ib-ui-dunkel);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.5;
+  box-shadow: 0 8px 28px rgba(0,0,0,.34);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .15s;
+}
+.ib-tour.ib-tour--an{ opacity: 1; visibility: visible; }
+.ib-tour-kopf{ display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+.ib-tour-nr{ font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase;
+             font-weight: 600; color: var(--ib-ui-hell); }
+.ib-tour-zu{
+  background: none; border: 0; color: var(--ib-ui-hell);
+  font-size: 20px; line-height: 1; padding: 0 2px; cursor: pointer;
+}
+.ib-tour-zu:hover{ color: #fff; }
+.ib-tour-t{ font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+.ib-tour-b{ color: #E4EDF3; }
+.ib-tour-fuss{ display: flex; align-items: center; justify-content: space-between; margin-top: 13px; }
+.ib-tour-punkte{ display: inline-flex; gap: 5px; }
+.ib-tour-punkte i{
+  width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(255,255,255,.32);
+}
+.ib-tour-punkte i.ib-an{ background: var(--ib-fill); }
+.ib-tour-btn{
+  padding: 7px 16px;
+  border: 0; border-radius: 0;
+  background: var(--ib-fill);
+  color: var(--ib-ui-dunkel); font: inherit; font-size: 13.5px; font-weight: 700;
+  cursor: pointer;
+}
+.ib-tour-pfeil{
+  position: absolute;
+  bottom: -8px; left: 50%; margin-left: -8px;
+  border: 8px solid transparent; border-top-color: var(--ib-ui-dunkel); border-bottom: 0;
+}
+.ib-tour--unten .ib-tour-pfeil{
+  bottom: auto; top: -8px;
+  border: 8px solid transparent; border-bottom-color: var(--ib-ui-dunkel); border-top: 0;
+}
+/* hervorgehobenes Ziel */
+.ib-tour-ziel{
+  box-shadow: 0 0 0 3pt rgba(94,136,163,.35), 0 0 0 1.2pt var(--ib-balken) !important;
+}
+
+/* =========================================================================
+   ERKLAERVIDEO – verschiebbares Fenster
+   Seitenverhaeltnis ueber --ib-video-format (Vorgabe 3/4 hochkant),
+   Breite ueber --ib-video-breite.
+   ========================================================================= */
+.ib-video{
+  --ib-video-format: 16 / 9;
+  --ib-video-breite: 330px;
+  position: fixed;
+  right: 20px; bottom: 20px;
+  z-index: 10001;
+  width: var(--ib-video-breite);
+  max-width: calc(100vw - 24px);
+  background: var(--ib-ui-dunkel);
+  color: #fff;
+  box-shadow: 0 10px 34px rgba(0,0,0,.42);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  transition: opacity .16s, transform .16s;
+}
+.ib-video.ib-video--an{ opacity: 1; visibility: visible; transform: none; }
+
+.ib-video-kopf{
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+  padding: 9px 8px 9px 13px;
+  background: var(--ib-balken);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.ib-video-kopf:active{ cursor: grabbing; }
+.ib-video-titel{ font-size: 13.5px; font-weight: 700; line-height: 1.25; }
+.ib-video-zu{
+  background: none; border: 0; color: #E4EDF3;
+  font-size: 19px; line-height: 1; padding: 0 3px; cursor: pointer; flex: none;
+}
+.ib-video-zu:hover{ color: #fff; }
+
+.ib-video-flaeche{
+  position: relative;
+  aspect-ratio: var(--ib-video-format);
+  background: #1B333F;
+  overflow: hidden;
+}
+.ib-video-player{
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border: 0;
+}
+.ib-video-platzhalter{
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 14px;
+  background:
+    repeating-linear-gradient(135deg, #213B49 0 12px, #26424F 12px 24px);
+}
+.ib-video-play{
+  width: 58px; height: 58px;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 50%;
+  background: rgba(255,255,255,.94);
+  color: var(--ib-ui-dunkel);
+  cursor: pointer;
+  padding-left: 4px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  transition: transform .12s, background-color .12s;
+}
+.ib-video-play:hover{ transform: scale(1.06); background: #fff; }
+.ib-video-play:focus-visible{ outline: 2px solid var(--ib-ui-hell); outline-offset: 3px; }
+.ib-video-hinweis{
+  font-size: 12px;
+  color: var(--ib-ui-hell);
+  text-align: center;
+  padding: 0 16px;
+  line-height: 1.4;
+}
+.ib-video-fuss{
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 13px 9px;
+  font-size: 12px;
+  color: #E4EDF3;
+}
+.ib-video-dauer{ color: var(--ib-ui-hell); }
+
+/* alle Eingabefelder kurz hervorheben (dritter Hinweis) */
+@keyframes ib-puls{
+  0%, 100%{ box-shadow: 0 0 0 0 rgba(94,136,163,0); }
+  50%     { box-shadow: 0 0 0 2.5pt rgba(94,136,163,.55); }
+}
+.ib-felder-zeigen .ib-in,
+.ib-felder-zeigen .ib-sel{
+  animation: ib-puls 1.5s ease-in-out infinite;
+  position: relative;
+  z-index: 1;
+}
+@media (prefers-reduced-motion: reduce){
+  .ib-felder-zeigen .ib-in,
+  .ib-felder-zeigen .ib-sel{ animation: none; box-shadow: 0 0 0 2pt rgba(94,136,163,.55); }
+}
+
+/* =========================================================================
+   DIN-A4-BLAETTER (wie im PDF-Betrachter)
+   Seite 1 hoch  |  Seite 2 quer  |  Seite 3 hoch
+   Die Blaetter werden per JS auf die verfuegbare Breite gezoomt (max 100 %).
+   ========================================================================= */
+.ib-sheets{
+  background: var(--ib-buehne);
+  padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+.ib-sheet{
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.28);
+  position: relative;
+  flex: none;
+  overflow: hidden;
+}
+.ib-sheet--hoch{ width: 595.32pt; height: 841.92pt; }
+.ib-sheet--quer{ width: 841.92pt; height: 595.32pt; }
+.ib-sheet-in{
+  position: absolute;
+  inset: 0;
+  padding: 24.6pt 17.9pt 20pt;   /* Seitenrand wie in der PDF-Vorlage */
+}
+
+/* ===== Seite / Abschnitt ================================================ */
+.ib-page{
+  width: 552pt;                 /* Satzspiegel Abschnitt 1 + 3          */
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+}
+.ib-page--wide{ width: 793pt; } /* Abschnitt 2 (Querformat)             */
+
+.ib-title{
+  font-size: var(--ib-fs);
+  padding: 0 0 20.2pt 1.08pt;
+  line-height: 9.96pt;
+}
+
+/* ===== Abschnittsbalken (blau) ========================================= */
+.ib-bar{
+  background: var(--ib-balken);
+  color: var(--ib-balken-txt);
+  font-weight: 700;
+  height: var(--ib-balken-h);
+  line-height: var(--ib-balken-h);
+  padding-left: var(--ib-balken-einzug);
+  margin-bottom: 1.96pt;
+}
+.ib-bar--wide{ font-weight:700; }
+
+/* ===== Zweispaltiges Raster ============================================ */
+.ib-cols{
+  display: grid;
+  grid-template-columns: 270.2pt 10.17pt 271.8pt;
+  align-items: start;
+}
+.ib-col{ min-width:0; }
+
+/* ===== Zeile =========================================================== */
+.ib-r{
+  display: grid;
+  align-items: center;
+  height: var(--ib-row);
+}
+.ib-col--l .ib-r{ grid-template-columns: var(--ib-lbl-w) var(--ib-val-w) 1pt var(--ib-pct-w); }
+.ib-col--r .ib-r{ grid-template-columns: var(--ib-lbl2-w) var(--ib-val2-w) 1pt var(--ib-pct2-w); }
+.ib-col--l .ib-r--wide{ grid-template-columns: var(--ib-lbl-w) 109pt; }
+
+.ib-r--hdr{ height: calc(13.08pt * var(--ib-luft)); }
+.ib-r--dbl{ height: calc(var(--ib-row) * 2); }
+.ib-r--spacer{ }
+.ib-lbl{ padding-left: 8.64pt; white-space: nowrap; }
+.ib-lbl--0{ padding-left: 1.08pt; }
+.ib-h{ font-weight:700; padding-left: 1.08pt; }
+.ib-col--r .ib-h{ padding-left: 0; }
+.ib-col--r .ib-lbl{ padding-left: 7.56pt; }
+.ib-col--r .ib-lbl--0{ padding-left: 0; }
+
+/* ===== Felder ========================================================== */
+.ib-f{                                   /* Basis: rechtsbuendiger Wert  */
+  height: var(--ib-box-h);
+  line-height: calc(var(--ib-box-h) - 1pt);
+  text-align: right;
+  color: var(--ib-txt-in);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.ib-f--val{ padding-right: 4.3pt; }      /* Euro-Betraege                */
+.ib-f--pct{ padding-right: 1.4pt; }      /* Prozent- und Textwerte       */
+.ib-f--ctr{ text-align: center; padding: 0; }
+
+.ib-f--free{ overflow: visible; }        /* darf ueberstehen, nie abschneiden */
+
+/* ===== Schriftverteilung ===============================================
+   Auf den Blaettern laeuft der gesamte Inhalt – Beschriftungen wie
+   Zahlen – in --ib-font-num (Inconsolata). Nur die Ueberschriften laufen
+   in --ib-font (Inter Tight); sie sind weiter unten einzeln aufgefuehrt.
+   Bedienelemente ausserhalb der Blaetter (Werkzeugleiste, Hinweise,
+   Formel-Popups) bleiben ebenfalls in der Textschrift.
+   Groessen und Farben bleiben unveraendert.
+   ---------------------------------------------------------------------- */
+.ib-sheet-in{ font-family: var(--ib-font-num); }
+
+/* Ueberschriften – bewusst in der Textschrift */
+.ib-title,
+.ib-bar,
+.ib-bar3,
+.ib-h,
+.ib-subbar,
+.ib-erg-h,
+.ib-fazit-txt b,
+.ib-tbl thead th,
+.ib-tbl tr.ib-band td{
+  font-family: var(--ib-font);
+}
+
+.ib-num,
+.ib-f--val,
+.ib-f--pct,
+.ib-tbl .ib-t-v,
+.ib-m-f,
+.ib-kpi-v,
+.ib-fazit-wert,
+.ib-fazit-txt span,
+#ib-zve-1-4,
+#ib-kirchensteuer-satz{
+  font-family: var(--ib-font-num);
+  font-size: calc(1em * var(--ib-num-scale));
+  font-variant-numeric: normal;          /* Inconsolata ist dicktengleich */
+  letter-spacing: 0;
+}
+
+.ib-in{                                  /* hellblau gefuelltes Feld     */
+  background: var(--ib-fill);
+  border: var(--ib-rahmen) solid var(--ib-border);
+}
+
+/* ===== Auswahlfeld (Dropdown) ========================================== */
+/* Sieht aus wie ein normales Eingabefeld, nur mit kleinem Pfeil rechts.   */
+.ib-sel{
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  color: var(--ib-txt-in);
+  text-align: center;
+  text-align-last: center;
+  cursor: pointer;
+  padding: 0 9pt 0 3pt;
+  border-radius: 0;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ib-txt-in) 50%),
+    linear-gradient(135deg, var(--ib-txt-in) 50%, transparent 50%);
+  background-position:
+    right 4.6pt top 50%,
+    right 2.4pt top 50%;
+  background-size: 2.2pt 2.2pt, 2.2pt 2.2pt;
+  background-repeat: no-repeat;
+}
+.ib-sel:focus-visible{ outline: 1.5pt solid var(--ib-blue); outline-offset: 0.5pt; }
+.ib-sel option{ color: #000; background: #fff; text-align: left; }
+.ib-out{                                 /* hellgraues Ausgabefeld       */
+  background: var(--ib-grey-lt);
+  border: var(--ib-rahmen) solid var(--ib-border);
+}
+.ib-out--dk{                             /* graues Feld, hervorgehoben   */
+  background: var(--ib-grey-dk);
+  border: var(--ib-rahmen) solid #000;
+}
+.ib-out--green{
+  background: var(--ib-green);
+  border: var(--ib-rahmen) solid #000;
+}
+.ib-out--res{                            /* Ergebnisfelder Seite 3       */
+  background: var(--ib-green);   /* vorher: var(--ib-fill-lt) */
+  border: var(--ib-rahmen) solid var(--ib-border);
+}
+
+/* durchgehend hellblau hinterlegte Beschriftung (z.B. "GrESt Bayern") */
+.ib-lbl--fill{
+  background: var(--ib-fill);
+  border: var(--ib-rahmen) solid var(--ib-border);
+  height: var(--ib-box-h);
+  line-height: calc(var(--ib-box-h) - 1.5pt);
+  color: var(--ib-txt-in);
+  padding-left: 1.08pt;
+}
+
+/* ===== Summenzeile (fett, Linie oben + Doppellinie unten) ============== */
+.ib-sum{
+  height: calc(var(--ib-row) * 1.3);   /* Ergebniszeile sitzt tiefer */
+  align-items: end;
+}
+.ib-sum .ib-lbl,
+.ib-sum .ib-f{ font-weight: 700; color: var(--ib-txt); }
+.ib-sum-line{
+  grid-column: 1 / span 2;
+  border-top: 0.75pt solid #000;
+  border-bottom: 2.6pt double #000;
+  display: grid;
+  grid-template-columns: var(--ib-lbl-w) var(--ib-val-w);
+  align-items: center;
+  height: 20pt;                        /* mehr Luft zwischen den Linien */
+}
+
+/* ===== Checkbox ======================================================== */
+.ib-cb{
+  display: inline-block;
+  cursor: pointer;
+  width: 8.4pt; height: 8.4pt;
+  border: var(--ib-rahmen-klein) solid #9a9a9a;
+  background: #fff;
+  vertical-align: -1pt;
+  position: relative;
+}
+.ib-cb--on::after{
+  content: "";
+  position: absolute; left: 2.4pt; top: 0.4pt;
+  width: 2.6pt; height: 5.4pt;
+  border: solid #000; border-width: 0 1.1pt 1.1pt 0;
+  transform: rotate(42deg);
+}
+.ib-cbrow{ font-size: var(--ib-fs-sm); white-space: nowrap; }
+.ib-cbrow .ib-cb{ margin-right: 4pt; }
+
+.ib-it{ font-style: italic; }
+
+/* Kopfbereich rechte Spalte "Finanzierung":
+   Hoehe = 4 Zeilen + 2 Leerzeilen der linken Spalte, damit "KFW 261" und
+   "Hauptdarlehen" buendig starten. */
+.ib-fin-top{
+  height: calc(var(--ib-row) * 6.3);
+  display: flex;
+  align-items: center;
+  padding-bottom: 10pt;
+}
+
+/* ---- Umschalter: Sondertilgung ODER Tilgungsersatzinstrument ---------- */
+.ib-wahl{ width: 100%; display: grid; gap: 13pt; }
+
+.ib-wahl-box{
+  display: grid;
+  grid-template-columns: 11pt 1fr;
+  column-gap: 6pt;
+  align-items: start;
+  padding: 0 0 0 1pt;
+  cursor: pointer;
+}
+.ib-wahl-box:focus-visible{ outline: 1.5pt solid var(--ib-blue); outline-offset: 2pt; }
+
+.ib-radio{
+  width: 9.6pt; height: 9.6pt;
+  margin-top: 1.6pt;
+  border: var(--ib-rahmen-klein) solid #9A9A9A;
+  border-radius: 50%;
+  background: #fff;
+  position: relative;
+  flex: none;
+}
+.ib-wahl-box--an .ib-radio{ border-color: var(--ib-blue-dk); }
+.ib-wahl-box--an .ib-radio::after{
+  content: "";
+  position: absolute; inset: 1.9pt;
+  border-radius: 50%;
+  background: var(--ib-blue-dk);
+}
+
+.ib-wahl-txt b{ display: block; font-weight: 700; line-height: 12.4pt; }
+.ib-wahl-txt small{
+  display: block;
+  font-size: 9.2pt; line-height: 11.6pt;
+  color: #5c5c5c;
+  padding-top: 1.5pt;
+}
+.ib-wahl-box--an .ib-wahl-txt small{ color: #3f3f3f; }
+.ib-wahl-box--an .ib-wahl-txt b{ color: #000; }
+
+.ib-wahl-feld{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8pt;
+  padding-top: 4.5pt;
+  padding-right: 58.8pt;  /* Feld buendig mit den Wertfeldern der rechten Spalte */
+}
+.ib-wahl-feld > span:first-child{ font-size: 9.9pt; }
+.ib-wahl-feld .ib-f{ width: 49.9pt; flex: none; }
+
+/* nicht gewaehlte Seite zurueckhaltender */
+.ib-wahl-box:not(.ib-wahl-box--an) .ib-wahl-txt b{ color: #6e6e6e; font-weight: 700; }
+.ib-wahl-box:not(.ib-wahl-box--an) .ib-wahl-txt small{ color: #8a8a8a; }
+.ib-wahl-box:not(.ib-wahl-box--an) .ib-wahl-feld{ opacity: .55; }
+.ib-note-sm{ font-size: var(--ib-fs-sm); }
+
+/* =========================================================================
+   ABSCHNITT 2 – 12-Jahres-Tabelle
+   ========================================================================= */
+.ib-tblwrap{
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+}
+.ib-tbl{
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 791.1pt;
+  table-layout: fixed;
+  font-size: var(--ib-fs);
+}
+.ib-tbl col.ib-c-lbl{ width: var(--ib-rowlbl-w); }
+.ib-tbl col.ib-c-y{   width: var(--ib-year-w); }
+
+.ib-tbl th, .ib-tbl td{
+  height: var(--ib-row2);
+  padding: 2.4pt 0 0;
+  vertical-align: middle;
+  white-space: nowrap;
+  font-weight: 400;
+}
+.ib-tbl .ib-t-lbl{
+  text-align: left;
+  padding-left: 8.5pt;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+}
+.ib-tbl .ib-t-v{ text-align: right; padding-right: 0; }
+.ib-tbl thead th.ib-t-v{ text-align: center; }
+
+/* Kopfzeile */
+.ib-tbl thead th{
+  color: var(--ib-blue-dk);
+  font-weight: 700;
+  border-top: 0.9pt solid var(--ib-blue);
+  border-bottom: 0.9pt solid var(--ib-blue);
+  height: 17.2pt;
+}
+.ib-tbl thead th.ib-t-lbl{ text-align: right; padding-right: 0; padding-left: 0; }
+
+/* Bandzeile (hellblau) */
+.ib-tbl tr.ib-band td{
+  background: var(--ib-fill);
+  color: var(--ib-blue-dk);
+  height: 16.3pt;
+}
+.ib-tbl tr.ib-band td.ib-t-lbl{
+  background: var(--ib-fill);
+  padding-left: 0;
+  font-weight: 400;
+}
+
+/* Summenzeile */
+.ib-tbl tr.ib-trsum td{
+  font-weight: 700;
+  border-top: 0.9pt solid var(--ib-blue);
+  border-bottom: 2.7pt double var(--ib-blue);
+  height: 18.5pt;
+}
+.ib-tbl tr.ib-trsum td.ib-t-lbl{ padding-left: 7pt; }
+
+/* Fussnote unter der Tabelle */
+.ib-tbl td.ib-tnote{
+  font-weight: 700;
+  height: 14.9pt;
+  padding-left: 0;
+  white-space: nowrap;
+}
+.ib-tnote{
+  font-weight: 700;
+  font-size: var(--ib-fs);
+  padding: 2.9pt 0 0 0;
+}
+
+.ib-tbl .ib-stick{ display: inline-block; }
+
+/* Zeilenbeschriftungen: ausgeschrieben am Bildschirm, sinnvoll gekuerzt
+   auf dem Handy – dort passt sonst keine Zeile in eine Zeile.          */
+.ib-kurz{ display: none; }
+
+/* ===== Info-Symbol + Formel-Popup ====================================== */
+.ib-info{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 11.5pt; height: 11.5pt;
+  margin-left: 4pt;
+  vertical-align: -1.4pt;
+  border: 0.75pt solid var(--ib-blue-dk);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ib-blue-dk);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 8.2pt;
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  flex: none;
+  box-sizing: border-box;
+  -webkit-appearance: none; appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  letter-spacing: 0; text-indent: 0; white-space: nowrap;
+  font-variant-numeric: normal;
+  transition: background-color .12s, color .12s;
+}
+/* Gefuellt nur, solange das Popup offen ist. Der Hover-Zustand gilt bewusst
+   nur fuer echte Mauszeiger – auf Touchgeraeten bleibt er sonst nach dem
+   Antippen haengen und das Symbol sieht dauerhaft anders aus als die uebrigen. */
+@media (hover: hover) and (pointer: fine){
+  .ib-info:hover{ background: var(--ib-blue-dk); color: #fff; }
+}
+.ib-info[aria-expanded="true"]{ background: var(--ib-blue-dk); color: #fff; }
+.ib-info:focus-visible{ outline: 1.5pt solid var(--ib-blue); outline-offset: 1pt; }
+
+.ib-tip{
+  position: fixed;
+  z-index: 9999;
+  max-width: 330px;
+  padding: 12px 15px 13px;
+  background: var(--ib-ui-dunkel);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.45;
+  font-style: normal;
+  font-weight: 400;
+  text-align: left;
+  box-shadow: 0 6px 22px rgba(0,0,0,.28);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .12s;
+  pointer-events: none;
+}
+.ib-tip.ib-tip--an{ opacity: 1; visibility: visible; }
+.ib-tip-t{ font-weight: 700; margin-bottom: 6px; }
+.ib-tip-f{ white-space: pre-line; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 12.5px; color: var(--ib-ui-hell); }
+.ib-tip-k{ margin-top: 8px; color: #E4EDF3; font-size: 12px; }
+.ib-tip-k:empty{ display: none; }
+.ib-tip-pfeil{
+  position: absolute;
+  bottom: -7px; left: 50%;
+  margin-left: -7px;
+  border: 7px solid transparent;
+  border-top-color: var(--ib-ui-dunkel);
+  border-bottom: 0;
+}
+.ib-tip--unten .ib-tip-pfeil{
+  bottom: auto; top: -7px;
+  border: 7px solid transparent;
+  border-bottom-color: var(--ib-ui-dunkel);
+  border-top: 0;
+}
+.ib-swipehint{ display:none; }
+
+/* =========================================================================
+   ABSCHNITT 3 – Monatsebene
+   ========================================================================= */
+.ib-p3{ padding-left: 13pt; }            /* Abschnitt 3 ist um 13pt eingerueckt */
+
+.ib-bar3{
+  background: var(--ib-balken);
+  color: var(--ib-balken-txt); font-weight:700;
+  height: var(--ib-balken-h3); line-height: var(--ib-balken-h3);
+  padding-left: var(--ib-balken-einzug);
+  width: 522.2pt; max-width:100%;
+}
+
+.ib-zeitraum-h{
+  display: grid; grid-template-columns: 393.6pt 1fr;
+  align-items: center; height: 16pt;
+}
+.ib-zeitraum-r{
+  display: grid;
+  grid-template-columns: 112.3pt 47.5pt 17.8pt 49.9pt 1fr;
+  align-items: center; height: 21.2pt; margin-top: 1.4pt;
+}
+.ib-zeitraum-r > .ib-white{ padding-left: 175.4pt; }
+
+.ib-subbar{
+  background: var(--ib-fill);
+  height: 21.6pt; line-height: 21.6pt;
+  padding-left: var(--ib-balken-einzug);
+  font-weight: 700;
+}
+.ib-subbar span{ font-weight: 400; }
+
+.ib-m-cols{
+  display: grid;
+  grid-template-columns: 247.2pt 27.3pt 247.2pt;
+  align-items: stretch;
+  position: relative;
+}
+.ib-m-r{
+  display: grid;
+  grid-template-columns: 177.6pt 49.9pt;
+  align-items: center;
+  height: calc(18.8pt * var(--ib-luft));
+}
+.ib-m-col--r .ib-m-r{ grid-template-columns: 180pt 52.3pt; }
+.ib-m-col--r .ib-m-r--z{ grid-template-columns: 90.7pt 35.1pt 54.2pt 52.3pt; }
+.ib-m-gap{ height: 11.4pt; }
+
+.ib-m-lbl{ padding-left: 9.1pt; }
+.ib-m-lbl--i{ padding-left: 26.5pt; }
+.ib-m-lbl--b{ padding-left: 16.6pt; font-weight:700; }
+.ib-m-col--r .ib-m-lbl{ padding-left: 9.3pt; }
+.ib-m-col--r .ib-m-lbl--i{ padding-left: 26.7pt; }
+
+.ib-m-f{
+  height: calc(var(--ib-box-h) + 1.1pt); line-height: calc(var(--ib-box-h) + 0.1pt);
+  text-align: right; padding-right: 1.4pt;
+  color: var(--ib-txt-in);
+  white-space: nowrap;
+}
+.ib-m-f--tall{ height: 21.6pt; line-height: 20.6pt; }
+
+.ib-resband{
+  background: var(--ib-grey-md);
+  border-top: 0.75pt dotted #000;
+  border-bottom: 0.75pt dotted #000;
+  /* Mindesthoehe statt fester Hoehe: bricht der Erklaertext bei einer
+     breiteren Schrift doch um, waechst das Band mit, statt zu ueberlaufen */
+  min-height: 45.5pt;
+  padding: 3.5pt 0;
+  display: grid;
+  grid-template-columns: 177.6pt 49.9pt;
+  align-items: center;
+}
+.ib-resband--r{ grid-template-columns: 180pt 52.3pt; }
+.ib-resttl{ padding-left: 6.4pt; padding-right: 4pt; min-width: 0; }
+.ib-resttl b{ display:block; font-weight:700; line-height: 12.6pt; }
+.ib-resttl small{
+  display:block; font-size: 8.8pt; line-height: 11.6pt;
+  padding-left: 7.2pt; padding-top: 1pt; color: #3f3f3f;
+  text-wrap: balance;
+}
+
+/* beide Baender enden auf gleicher Hoehe, auch wenn eines hoeher wird */
+.ib-m-col{ display: flex; flex-direction: column; }
+.ib-m-col > *{ flex: none; }   /* Zeilen duerfen nicht gestaucht werden */
+.ib-m-col .ib-resband{ margin-top: auto; }
+
+/* roter Verbindungspfeil – Endpunkte wachsen mit --ib-luft mit.
+   oben  = 21.6pt (Bandhoehe) + 2,5 Zeilen   |   unten = 48.6pt + 7 Zeilen  */
+.ib-arrow{
+  position: absolute;
+  left: 235.2pt; top: 0; width: 60pt; height: 100%;
+  pointer-events: none;
+}
+.ib-arrow span{ position: absolute; background: var(--ib-red); }
+.ib-arrow-u{ left: 0;      top: calc(54.6pt + 131.6pt * var(--ib-luft)); width: 25.6pt; height: 2pt; }
+.ib-arrow-v{ left: 23.6pt; top: calc(20.6pt + 47pt   * var(--ib-luft));
+             width: 2pt;   height: calc(36pt + 84.6pt * var(--ib-luft)); }
+.ib-arrow-o{ left: 23.6pt; top: calc(20.6pt + 47pt   * var(--ib-luft)); width: 32pt; height: 2pt; }
+.ib-arrow .ib-arrow-s{
+             left: 55.6pt; top: calc(15.6pt + 47pt * var(--ib-luft));
+             width: 0; height: 0; background: none;
+             border: 5pt solid transparent; border-right: 0; border-left-color: var(--ib-red); }
+
+.ib-hint{
+  text-align: right;
+  font-weight: 700;
+  line-height: 14.6pt;
+  padding-top: 15.7pt;
+  width: 515pt; max-width: 100%;
+}
+
+.ib-ergwrap{ position: relative; }
+.ib-erg-h{
+  position: absolute; top: 0; left: 2.2pt;
+  font-size: 17.5pt; font-weight: 700; line-height: 17.5pt;
+  white-space: nowrap;
+}
+.ib-erg{
+  display: grid;
+  grid-template-columns: 284pt 238pt;
+  align-items: center;
+  padding-top: 38pt;
+}
+
+/* ---- Kreis + Legende ---- */
+.ib-diagramm{ width: 284pt; }
+.ib-piewrap{ width: 100%; }
+.ib-pie{ width: 100%; height: auto; display: block; overflow: visible; }
+
+/* ---- Kennzahlen ---- */
+.ib-kpi{ padding-left: 10pt; }
+.ib-kpi-row{
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 52.3pt;
+  align-items: start;
+  column-gap: 6pt;
+  padding-bottom: 22pt;
+}
+.ib-kpi-row:last-child{ padding-bottom: 0; }
+.ib-kpi-t{ text-align: right; }
+.ib-kpi-t b{ display: block; font-weight: 700; line-height: 12.6pt; text-wrap: balance; }
+.ib-kpi-t small{ display: block; font-size: 9pt; line-height: 12pt; color: #4a4a4a; padding-top: 2pt; text-wrap: balance; }
+.ib-kpi-v{
+  height: calc(var(--ib-box-h) + 1pt); line-height: var(--ib-box-h);
+  text-align: right; padding-right: 1.2pt;
+  color: var(--ib-txt-in);
+}
+
+/* ---- Zusammenfassung: Netto-Rendite ---- */
+.ib-fazit{
+  margin-top: 30pt;
+  width: 522.2pt; max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16pt;
+  padding: 8.5pt 12pt 9pt;
+  /* gleiche Fuellung wie die Eingabefelder, bewusst ohne Rahmen */
+  background: var(--ib-fill);
+}
+.ib-fazit-txt b{
+  display: block;
+  font-weight: 700;
+  font-size: 11.5pt;
+  line-height: 14.2pt;
+}
+.ib-fazit-txt span{
+  display: block;
+  font-size: 9.7pt;
+  line-height: 12.6pt;
+  color: #4a4a4a;
+  padding-top: 1.5pt;
+}
+.ib-fazit-wert{
+  font-size: 16.5pt;
+  font-weight: 700;
+  color: #000;
+  white-space: nowrap;
+}
+
+.ib-formula{
+  font-style: italic;
+  padding: 30.7pt 0 0 1.5pt;
+  line-height: 14.55pt;
+}
+.ib-formula .ib-fn{ font-size: var(--ib-fs-note); line-height: 11pt; padding-top: 2pt; }
+
+.ib-white{ color: #fff; }
+
+/* =========================================================================
+   MOBILE / SCHMALE ANSICHT
+   Die Regeln stehen einmal als @media (Viewport) und einmal als @container
+   (Breite des umgebenden Elements) – so funktioniert die Umschaltung auch,
+   wenn der Block auf der Website in einer schmalen Spalte steckt.
+   ========================================================================= */
+@media screen and (max-width: 820px){ 
+  .ib-doc{
+    --ib-fs: 15px;
+    --ib-fs-sm: 13px;
+    --ib-fs-note: 12px;
+    --ib-row: 30px;
+    --ib-box-h: 23px;
+    --ib-row2: 30px;
+    --ib-year-w: 76px;         /* ~2,8 Jahre gleichzeitig sichtbar */
+    --ib-rowlbl-w: 176px;   /* Platz fuer die gekuerzten Zeilentexte */
+    line-height: 1.25;
+  }
+  .ib-page, .ib-page--wide{ width: 100%; margin-bottom: 26px; }
+  /* Auch auf dem Handy sollen es drei erkennbare Blaetter sein – wie im
+     PDF-Betrachter. Die Buehne liegt DAHINTER und wird nur in den
+     Zwischenraeumen sichtbar; seitlich kostet das keinen Platz.        */
+  /* Die Blattgrenzen werden durch graue Streifen markiert – wie die Luecke
+     zwischen zwei Seiten im PDF-Betrachter. Bewusst KEINE Blattflaeche und
+     kein Schatten: sonst entstuende links und rechts eine sichtbare Kante. */
+  .ib-sheets{
+    background: none; padding: 0; display: block;
+    border-top: 18px solid var(--ib-buehne);
+  }
+  .ib-sheet{
+    width: auto !important; height: auto !important;
+    zoom: 1 !important; overflow: visible;
+    background: none; box-shadow: none;
+  }
+  .ib-sheet + .ib-sheet{
+    margin-top: 22px;
+    border-top: 18px solid var(--ib-buehne);
+    padding-top: 22px;
+  }
+  .ib-sheet-in{ position: static; padding: 18px 0 4px; }
+  .ib-title{ padding: 0 0 12px 2px !important; font-weight: 700; line-height: 1.3; }
+
+  /* Abschnittsbalken bekommen oben Luft – die Zwischenraeume der
+     zweispaltigen Ansicht (.ib-gap) entfallen hier ja. */
+  .ib-bar{ height: 32px; line-height: 32px; padding-left: 10px; margin: 40px 0 14px !important; }
+  .ib-title + .ib-bar{ margin-top: 0 !important; }
+  .ib-bar + .ib-cols{ margin-top: 0; }
+  .ib-bar3{ margin-top: 40px; }
+  /* Gruppentitel (Allgemeine Daten, Kaufpreis, Miete …) bekommen Luft,
+     der erste in einer Spalte nicht – er steht schon unter dem Balken. */
+  .ib-r--hdr, .ib-r--grp{ margin-top: 20px; }
+  .ib-col > .ib-r:first-child,
+  .ib-col--r > .ib-r:first-child{ margin-top: 0; }
+
+  /* --- Spalten untereinander --- */
+  .ib-cols{ display: block; }
+  .ib-gap{ display: none; }
+  .ib-col--r{ margin-top: 12px; }
+
+  .ib-col--l .ib-r,
+  .ib-col--r .ib-r,
+  .ib-col--l .ib-r--wide{
+    grid-template-columns: minmax(0,1fr) 96px 3px 62px;
+    height: auto;
+    min-height: var(--ib-row);
+    align-items: center;
+  }
+  .ib-r--hdr, .ib-r--dbl{ height: auto !important; min-height: 26px; }
+  .ib-fin-top{ height: auto; display: block; padding: 10px 0 14px; }
+  .ib-wahl{ gap: 18px; }
+  .ib-wahl-box{ grid-template-columns: 20px 1fr; column-gap: 10px; padding: 0; }
+  .ib-radio{ width: 18px; height: 18px; margin-top: 1px; }
+  .ib-wahl-box--an .ib-radio::after{ inset: 4px; }
+  .ib-wahl-txt b{ line-height: 1.3; }
+  .ib-wahl-txt small{ font-size: 13px; line-height: 1.35; padding-top: 3px; }
+  .ib-wahl-feld > span:first-child{ font-size: 14px; }
+  .ib-wahl-feld .ib-f{ width: 74px; height: 23px; line-height: 22px; }
+  .ib-r--dbl{ align-items: center !important; }
+  .ib-r--dbl .ib-it{ line-height: 1.3 !important; padding-top: 0 !important; }
+  .ib-lbl, .ib-col--r .ib-lbl{ padding-left: 10px; white-space: normal; }
+  .ib-lbl--0, .ib-col--r .ib-lbl--0, .ib-h, .ib-col--r .ib-h{ padding-left: 2px; }
+  .ib-r--spacer{ display: none; }
+  .ib-col--r .ib-r:empty{ display: none; }
+
+  .ib-col--l .ib-r--wide{ grid-template-columns: minmax(0,1fr) minmax(152px, max-content); }
+  .ib-col--l .ib-r--wide .ib-f--ctr{ padding: 0 8px; }
+  .ib-sel{ font-size: 16px; padding: 0 15px 0 4px; background-position: right 9px top 50%, right 5px top 50%;
+           background-size: 4.5px 4.5px, 4.5px 4.5px; }
+  .ib-col--l .ib-r--wide .ib-sel{ padding: 0 18px 0 8px; background-position: right 11px top 50%, right 6px top 50%; }
+  .ib-sum{ align-items: stretch; }
+  .ib-sum-line{ grid-template-columns: minmax(0,1fr) 96px; height: auto; min-height: 32px; margin: 5px 0 9px; }
+  .ib-lbl--fill{ line-height: calc(var(--ib-box-h) - 2px); padding-left: 6px; }
+  .ib-cbrow{ white-space: normal; line-height: 1.35; }
+  .ib-f--ctr{ text-align: right; padding-right: 6px; }
+
+  /* --- Abschnitt 2: horizontal wischbare Tabelle --- */
+  .ib-tblwrap{
+    scroll-snap-type: x proximity;
+    position: relative;
+  }
+  .ib-tbl{ width: max-content; font-size: 13.5px; }
+  .ib-tbl th, .ib-tbl td{ height: var(--ib-row2); padding-top: 0; }
+  .ib-tbl thead th.ib-t-v{ text-align: right; }
+  .ib-tbl .ib-t-lbl{
+    padding-left: 6px;
+    white-space: nowrap;
+    line-height: 1.15;
+  }
+  .ib-tbl .ib-t-v{ padding-right: 10px; scroll-snap-align: end; }
+  .ib-lang{ display: none; }
+  .ib-kurz{ display: inline; }
+  .ib-tbl thead th.ib-t-lbl{ text-align: left; padding-left: 6px; }
+  .ib-tbl tr.ib-band td.ib-t-lbl{ box-shadow: none; padding-left: 6px; }
+  .ib-tbl tr.ib-trsum td.ib-t-lbl{ padding-left: 6px; }
+  .ib-tbl td.ib-tnote{ white-space: normal; box-shadow: none; height: auto; padding: 4px 0; }
+  .ib-tbl .ib-stick{ position: sticky; left: 6px; max-width: calc(100cqw - 24px); }
+  .ib-info{ width: 17px; height: 17px; font-size: 11px; margin-left: 5px; vertical-align: -3px; }
+  .ib-tip{ max-width: calc(100vw - 24px); font-size: 13.5px; }
+  .ib-video{ --ib-video-breite: 290px; right: 10px; bottom: 10px; }
+  .ib-video-play{ width: 48px; height: 48px; }
+  .ib-tnote{ font-size: var(--ib-fs-note); white-space: normal; padding-top: 6px; }
+
+  .ib-swipehint{
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12.5px; color: #6b6b6b;
+    padding: 2px 2px 8px;
+  }
+  .ib-swipehint svg{ flex: none; }
+
+  /* --- Abschnitt 3 --- */
+  .ib-p3{ padding-left: 0; }
+  .ib-bar3{ width: 100%; height: 26px; line-height: 26px; padding-left: 8px; }
+  .ib-zeitraum-h{ grid-template-columns: 1fr auto; height: auto; min-height: 28px; }
+  .ib-zeitraum-h > div:first-child{ padding-left: 2px !important; }
+  .ib-zeitraum-r{ grid-template-columns: minmax(0,1fr) 82px 8px 82px; height: auto; min-height: 34px; margin-top: 0; }
+  .ib-zeitraum-r > div:first-child{ padding-left: 2px !important; }
+  .ib-zeitraum-r > .ib-white{ display: none; }
+  .ib-zeitraum-r .ib-f{ height: 23px !important; line-height: 22px !important; }
+
+  .ib-subbar{ height: 26px; line-height: 26px; padding-left: 8px; }
+  .ib-m-cols{ display: block; }
+  .ib-m-col + .ib-m-col{ margin-top: 20px; }
+  .ib-m-r,
+  .ib-m-col--r .ib-m-r,
+  .ib-m-col--r .ib-m-r--z{ grid-template-columns: minmax(0,1fr) 96px; height: auto; min-height: 30px; }
+  .ib-m-r--z .ib-zins,
+  .ib-m-r--z > div:nth-child(3){ display: none; }
+  .ib-m-r:empty{ min-height: 12px; }
+  .ib-m-lbl, .ib-m-col--r .ib-m-lbl{ padding-left: 8px; }
+  .ib-m-lbl--i, .ib-m-col--r .ib-m-lbl--i{ padding-left: 18px; }
+  .ib-m-lbl--b{ padding-left: 12px; }
+  .ib-m-f{ height: 23px; line-height: 22px; padding-right: 6px; }
+  .ib-m-f--tall{ height: 27px; line-height: 26px; }
+  .ib-m-gap{ height: 10px; }
+  .ib-resband, .ib-resband--r{
+    grid-template-columns: minmax(0,1fr) 96px;
+    height: auto; min-height: 46px; padding: 6px 0;
+  }
+  .ib-resttl small{ padding-left: 0; }
+  .ib-arrow{ display: none; }
+  .ib-hint{ width: 100%; padding-top: 12px; line-height: 1.3; }
+
+  .ib-ergwrap{ padding-top: 0; }
+  .ib-erg-h{ position: static; font-size: 21px; line-height: 1.2; padding: 14px 0 6px 2px; }
+  .ib-erg{ display: block; padding-top: 0; }
+  .ib-diagramm{ width: 100%; max-width: 460px; margin: 0 auto; }
+  .ib-kpi{ padding: 34px 0 0; width: 100%; }
+  .ib-kpi-row{ grid-template-columns: minmax(0,1fr) 74px; column-gap: 10px; padding-bottom: 30px; }
+  .ib-kpi-row:last-child{ padding-bottom: 0; }
+  .ib-kpi-t b{ line-height: 1.3; }
+  .ib-kpi-t small{ line-height: 1.35; font-size: 12.5px; padding-top: 5px; }
+  .ib-kpi-v{ height: 23px; line-height: 22px; }
+  .ib-fazit{ width: 100%; margin-top: 36px; padding: 15px 14px 16px; gap: 12px;
+            flex-direction: column; align-items: flex-start; }
+  .ib-fazit-txt b{ font-size: 15px; line-height: 1.3; }
+  .ib-fazit-txt span{ font-size: 12.5px; line-height: 1.35; }
+  .ib-fazit-wert{ font-size: 21px; align-self: flex-end; }
+
+  .ib-formula{ font-size: 12.5px; line-height: 1.4; padding: 16px 0 0 2px; }
+  .ib-formula .ib-fn{ font-size: 11.5px; line-height: 1.35; }
+ }
+@media screen{
+@container ib (max-width: 820px){ 
+  .ib-doc{
+    --ib-fs: 15px;
+    --ib-fs-sm: 13px;
+    --ib-fs-note: 12px;
+    --ib-row: 30px;
+    --ib-box-h: 23px;
+    --ib-row2: 30px;
+    --ib-year-w: 76px;         /* ~2,8 Jahre gleichzeitig sichtbar */
+    --ib-rowlbl-w: 176px;   /* Platz fuer die gekuerzten Zeilentexte */
+    line-height: 1.25;
+  }
+  .ib-page, .ib-page--wide{ width: 100%; margin-bottom: 26px; }
+  /* Auch auf dem Handy sollen es drei erkennbare Blaetter sein – wie im
+     PDF-Betrachter. Die Buehne liegt DAHINTER und wird nur in den
+     Zwischenraeumen sichtbar; seitlich kostet das keinen Platz.        */
+  /* Die Blattgrenzen werden durch graue Streifen markiert – wie die Luecke
+     zwischen zwei Seiten im PDF-Betrachter. Bewusst KEINE Blattflaeche und
+     kein Schatten: sonst entstuende links und rechts eine sichtbare Kante. */
+  .ib-sheets{
+    background: none; padding: 0; display: block;
+    border-top: 18px solid var(--ib-buehne);
+  }
+  .ib-sheet{
+    width: auto !important; height: auto !important;
+    zoom: 1 !important; overflow: visible;
+    background: none; box-shadow: none;
+  }
+  .ib-sheet + .ib-sheet{
+    margin-top: 22px;
+    border-top: 18px solid var(--ib-buehne);
+    padding-top: 22px;
+  }
+  .ib-sheet-in{ position: static; padding: 18px 0 4px; }
+  .ib-title{ padding: 0 0 12px 2px !important; font-weight: 700; line-height: 1.3; }
+
+  /* Abschnittsbalken bekommen oben Luft – die Zwischenraeume der
+     zweispaltigen Ansicht (.ib-gap) entfallen hier ja. */
+  .ib-bar{ height: 32px; line-height: 32px; padding-left: 10px; margin: 40px 0 14px !important; }
+  .ib-title + .ib-bar{ margin-top: 0 !important; }
+  .ib-bar + .ib-cols{ margin-top: 0; }
+  .ib-bar3{ margin-top: 40px; }
+  /* Gruppentitel (Allgemeine Daten, Kaufpreis, Miete …) bekommen Luft,
+     der erste in einer Spalte nicht – er steht schon unter dem Balken. */
+  .ib-r--hdr, .ib-r--grp{ margin-top: 20px; }
+  .ib-col > .ib-r:first-child,
+  .ib-col--r > .ib-r:first-child{ margin-top: 0; }
+
+  /* --- Spalten untereinander --- */
+  .ib-cols{ display: block; }
+  .ib-gap{ display: none; }
+  .ib-col--r{ margin-top: 12px; }
+
+  .ib-col--l .ib-r,
+  .ib-col--r .ib-r,
+  .ib-col--l .ib-r--wide{
+    grid-template-columns: minmax(0,1fr) 96px 3px 62px;
+    height: auto;
+    min-height: var(--ib-row);
+    align-items: center;
+  }
+  .ib-r--hdr, .ib-r--dbl{ height: auto !important; min-height: 26px; }
+  .ib-fin-top{ height: auto; display: block; padding: 10px 0 14px; }
+  .ib-wahl{ gap: 18px; }
+  .ib-wahl-box{ grid-template-columns: 20px 1fr; column-gap: 10px; padding: 0; }
+  .ib-radio{ width: 18px; height: 18px; margin-top: 1px; }
+  .ib-wahl-box--an .ib-radio::after{ inset: 4px; }
+  .ib-wahl-txt b{ line-height: 1.3; }
+  .ib-wahl-txt small{ font-size: 13px; line-height: 1.35; padding-top: 3px; }
+  .ib-wahl-feld > span:first-child{ font-size: 14px; }
+  .ib-wahl-feld .ib-f{ width: 74px; height: 23px; line-height: 22px; }
+  .ib-r--dbl{ align-items: center !important; }
+  .ib-r--dbl .ib-it{ line-height: 1.3 !important; padding-top: 0 !important; }
+  .ib-lbl, .ib-col--r .ib-lbl{ padding-left: 10px; white-space: normal; }
+  .ib-lbl--0, .ib-col--r .ib-lbl--0, .ib-h, .ib-col--r .ib-h{ padding-left: 2px; }
+  .ib-r--spacer{ display: none; }
+  .ib-col--r .ib-r:empty{ display: none; }
+
+  .ib-col--l .ib-r--wide{ grid-template-columns: minmax(0,1fr) minmax(152px, max-content); }
+  .ib-col--l .ib-r--wide .ib-f--ctr{ padding: 0 8px; }
+  .ib-sel{ font-size: 16px; padding: 0 15px 0 4px; background-position: right 9px top 50%, right 5px top 50%;
+           background-size: 4.5px 4.5px, 4.5px 4.5px; }
+  .ib-col--l .ib-r--wide .ib-sel{ padding: 0 18px 0 8px; background-position: right 11px top 50%, right 6px top 50%; }
+  .ib-sum{ align-items: stretch; }
+  .ib-sum-line{ grid-template-columns: minmax(0,1fr) 96px; height: auto; min-height: 32px; margin: 5px 0 9px; }
+  .ib-lbl--fill{ line-height: calc(var(--ib-box-h) - 2px); padding-left: 6px; }
+  .ib-cbrow{ white-space: normal; line-height: 1.35; }
+  .ib-f--ctr{ text-align: right; padding-right: 6px; }
+
+  /* --- Abschnitt 2: horizontal wischbare Tabelle --- */
+  .ib-tblwrap{
+    scroll-snap-type: x proximity;
+    position: relative;
+  }
+  .ib-tbl{ width: max-content; font-size: 13.5px; }
+  .ib-tbl th, .ib-tbl td{ height: var(--ib-row2); padding-top: 0; }
+  .ib-tbl thead th.ib-t-v{ text-align: right; }
+  .ib-tbl .ib-t-lbl{
+    padding-left: 6px;
+    white-space: nowrap;
+    line-height: 1.15;
+  }
+  .ib-tbl .ib-t-v{ padding-right: 10px; scroll-snap-align: end; }
+  .ib-lang{ display: none; }
+  .ib-kurz{ display: inline; }
+  .ib-tbl thead th.ib-t-lbl{ text-align: left; padding-left: 6px; }
+  .ib-tbl tr.ib-band td.ib-t-lbl{ box-shadow: none; padding-left: 6px; }
+  .ib-tbl tr.ib-trsum td.ib-t-lbl{ padding-left: 6px; }
+  .ib-tbl td.ib-tnote{ white-space: normal; box-shadow: none; height: auto; padding: 4px 0; }
+  .ib-tbl .ib-stick{ position: sticky; left: 6px; max-width: calc(100cqw - 24px); }
+  .ib-info{ width: 17px; height: 17px; font-size: 11px; margin-left: 5px; vertical-align: -3px; }
+  .ib-tip{ max-width: calc(100vw - 24px); font-size: 13.5px; }
+  .ib-video{ --ib-video-breite: 290px; right: 10px; bottom: 10px; }
+  .ib-video-play{ width: 48px; height: 48px; }
+  .ib-tnote{ font-size: var(--ib-fs-note); white-space: normal; padding-top: 6px; }
+
+  .ib-swipehint{
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12.5px; color: #6b6b6b;
+    padding: 2px 2px 8px;
+  }
+  .ib-swipehint svg{ flex: none; }
+
+  /* --- Abschnitt 3 --- */
+  .ib-p3{ padding-left: 0; }
+  .ib-bar3{ width: 100%; height: 26px; line-height: 26px; padding-left: 8px; }
+  .ib-zeitraum-h{ grid-template-columns: 1fr auto; height: auto; min-height: 28px; }
+  .ib-zeitraum-h > div:first-child{ padding-left: 2px !important; }
+  .ib-zeitraum-r{ grid-template-columns: minmax(0,1fr) 82px 8px 82px; height: auto; min-height: 34px; margin-top: 0; }
+  .ib-zeitraum-r > div:first-child{ padding-left: 2px !important; }
+  .ib-zeitraum-r > .ib-white{ display: none; }
+  .ib-zeitraum-r .ib-f{ height: 23px !important; line-height: 22px !important; }
+
+  .ib-subbar{ height: 26px; line-height: 26px; padding-left: 8px; }
+  .ib-m-cols{ display: block; }
+  .ib-m-col + .ib-m-col{ margin-top: 20px; }
+  .ib-m-r,
+  .ib-m-col--r .ib-m-r,
+  .ib-m-col--r .ib-m-r--z{ grid-template-columns: minmax(0,1fr) 96px; height: auto; min-height: 30px; }
+  .ib-m-r--z .ib-zins,
+  .ib-m-r--z > div:nth-child(3){ display: none; }
+  .ib-m-r:empty{ min-height: 12px; }
+  .ib-m-lbl, .ib-m-col--r .ib-m-lbl{ padding-left: 8px; }
+  .ib-m-lbl--i, .ib-m-col--r .ib-m-lbl--i{ padding-left: 18px; }
+  .ib-m-lbl--b{ padding-left: 12px; }
+  .ib-m-f{ height: 23px; line-height: 22px; padding-right: 6px; }
+  .ib-m-f--tall{ height: 27px; line-height: 26px; }
+  .ib-m-gap{ height: 10px; }
+  .ib-resband, .ib-resband--r{
+    grid-template-columns: minmax(0,1fr) 96px;
+    height: auto; min-height: 46px; padding: 6px 0;
+  }
+  .ib-resttl small{ padding-left: 0; }
+  .ib-arrow{ display: none; }
+  .ib-hint{ width: 100%; padding-top: 12px; line-height: 1.3; }
+
+  .ib-ergwrap{ padding-top: 0; }
+  .ib-erg-h{ position: static; font-size: 21px; line-height: 1.2; padding: 14px 0 6px 2px; }
+  .ib-erg{ display: block; padding-top: 0; }
+  .ib-diagramm{ width: 100%; max-width: 460px; margin: 0 auto; }
+  .ib-kpi{ padding: 34px 0 0; width: 100%; }
+  .ib-kpi-row{ grid-template-columns: minmax(0,1fr) 74px; column-gap: 10px; padding-bottom: 30px; }
+  .ib-kpi-row:last-child{ padding-bottom: 0; }
+  .ib-kpi-t b{ line-height: 1.3; }
+  .ib-kpi-t small{ line-height: 1.35; font-size: 12.5px; padding-top: 5px; }
+  .ib-kpi-v{ height: 23px; line-height: 22px; }
+  .ib-fazit{ width: 100%; margin-top: 36px; padding: 15px 14px 16px; gap: 12px;
+            flex-direction: column; align-items: flex-start; }
+  .ib-fazit-txt b{ font-size: 15px; line-height: 1.3; }
+  .ib-fazit-txt span{ font-size: 12.5px; line-height: 1.35; }
+  .ib-fazit-wert{ font-size: 21px; align-self: flex-end; }
+
+  .ib-formula{ font-size: 12.5px; line-height: 1.4; padding: 16px 0 0 2px; }
+  .ib-formula .ib-fn{ font-size: 11.5px; line-height: 1.35; }
+ }
+}
+
+/* =========================================================================
+   DRUCKEN / ALS PDF SPEICHERN
+   Drei A4-Seiten: hoch, quer, hoch. Ohne Werkzeugleiste, ohne graue Flaeche.
+   ========================================================================= */
+@page{ size: A4 portrait; margin: 15mm; }
+@page ib-quer{ size: A4 landscape; margin: 15mm; }
+
+@media print{
+  .ib-werkzeuge, .ib-tour, .ib-tip, .ib-video, .ib-swipehint{ display: none !important; }
+  .ib-felder-zeigen .ib-in, .ib-felder-zeigen .ib-sel{ animation: none; box-shadow: none; }
+
+  *{
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  html, body{ margin: 0 !important; padding: 0 !important; width: auto !important; height: auto !important; background: #fff !important; }
+  .ib-doc{ container-type: normal; padding: 0; }
+  .ib-sheets{ background: none !important; padding: 0 !important; gap: 0 !important; display: block !important; width: auto !important; }
+
+  .ib-sheet{
+    zoom: 1 !important;
+    transform: none !important;
+    box-shadow: none;
+    margin: 0 !important;
+    break-after: page;
+    page-break-after: always;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    overflow: hidden;
+  }
+  /* Blaetter bleiben in ihrer echten Entwurfsgroesse (594x839 / 839x594pt) –
+     nur per zoom verkleinert, damit das feste Pt-Raster innen nicht durch
+     eine geaenderte Breite umbricht. So bleibt Platz fuer den @page-Rand. */
+  .ib-sheet--hoch{ width: 594pt !important; height: 839pt !important; zoom: 0.857 !important; }
+  .ib-sheet--quer{ width: 839pt !important; height: 594pt !important; zoom: 0.857 !important; }
+  .ib-sheet:last-child{ break-after: auto; page-break-after: auto; }
+  .ib-sheet--quer{ page: ib-quer; }
+  .ib-sheet-in{ width: 100% !important; height: 100% !important; }
+
+  .ib-tblwrap{ overflow: visible !important; }
+  .ib-tbl .ib-t-lbl{ position: static; box-shadow: none; }
+  .ib-info{ display: none; }        /* Formelsymbole auf Papier ohne Funktion */
+}
+</style>
+</head>
+<body>
+
+<div class="ib-doc">
+
+<!-- Werkzeugleiste (wird beim Drucken ausgeblendet) -->
+<div class="ib-werkzeuge" role="toolbar" aria-label="Werkzeuge">
+  <button type="button" class="ib-btn ib-btn--haupt" id="ib-btn-drucken">
+    <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6V2.5h7V6M4.5 12.5h7V10h-7zM3 6h10a1.5 1.5 0 0 1 1.5 1.5V11H11v-1H5v1H1.5V7.5A1.5 1.5 0 0 1 3 6z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+    Drucken / als PDF speichern
+  </button>
+  <button type="button" class="ib-btn" id="ib-btn-reset">Zurücksetzen</button>
+  <button type="button" class="ib-btn" id="ib-btn-hinweise">Hinweise anzeigen</button>
+  <button type="button" class="ib-btn" id="ib-btn-video">
+    <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3.8v8.4L12.5 8z" fill="currentColor"/></svg>
+    Erklärvideo
+  </button>
+  <span class="ib-status" id="ib-status" role="status" aria-live="polite"></span>
+</div>
+
+<div class="ib-sheets">
+
+<!-- ======================================================================
+     ABSCHNITT 1 : EINGABEN
+     ====================================================================== -->
+<div class="ib-sheet ib-sheet--hoch"><div class="ib-sheet-in">
+<section class="ib-page" id="ib-abschnitt-1">
+
+  <div class="ib-title">Abschnitt 1: Eingaben</div>
+
+  <!-- ---------- IMMOBILIE ---------- -->
+  <div class="ib-bar">Immobilie</div>
+
+  <div class="ib-cols">
+    <div class="ib-col ib-col--l">
+
+      <div class="ib-r ib-r--hdr"><div class="ib-h">Allgemeine Daten</div></div>
+
+      <div class="ib-r ib-r--wide">
+        <div class="ib-lbl">Projekt</div>
+        <select class="ib-f ib-in ib-f--ctr ib-sel" id="ib-projekt" aria-label="Projekt auswählen">
+          <!-- wird aus IB_PROJEKTE befüllt (Script am Ende der Datei) -->
+        </select>
+      </div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Einheit</div>
+        <select class="ib-f ib-in ib-f--ctr ib-sel" id="ib-einheit" aria-label="Einheit auswählen">
+          <!-- wird beim Projektwechsel neu befüllt -->
+        </select>
+      </div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Gesamtfläche</div>
+        <div class="ib-f ib-in ib-f--val" id="ib-gesamtflaeche" style="color:#000">107,8 m²</div>
+      </div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Baujahr</div>
+        <div class="ib-f ib-f--ctr ib-f--free" style="text-align:left;padding-left:16.5pt">
+          <span class="ib-cb" id="ib-baujahr-vor1925"></span>
+          <span class="ib-note-sm" style="color:#000;margin-left:4pt">vor 1925</span>
+        </div>
+      </div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Wertsteigerung p.a.</div>
+        <div class="ib-f ib-in ib-f--pct" id="ib-wertsteigerung">1,5 %</div>
+      </div>
+
+      <div class="ib-r ib-r--spacer"></div>
+
+      <div class="ib-r ib-r--hdr"><div class="ib-h">Kaufpreis</div></div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Kaufpreis Einheit</div>
+        <div class="ib-f ib-in ib-f--val" id="ib-kaufpreis-einheit">814.192 €</div>
+      </div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Stellplatz</div>
+        <div class="ib-f ib-in ib-f--val" id="ib-kaufpreis-stellplatz">&nbsp;</div>
+      </div>
+
+      <div class="ib-r ib-r--grp"><div class="ib-h">Kaufnebenkosten</div></div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Notarkosten</div>
+        <div class="ib-f ib-f--val" id="ib-notarkosten">16.284 €</div>
+        <div></div>
+        <div class="ib-f ib-in ib-f--pct" id="ib-notarkosten-satz">2,0 %</div>
+      </div>
+
+      <div class="ib-r">
+        <select class="ib-lbl--fill ib-in ib-sel" id="ib-grest-label" aria-label="Bundesland auswählen (steuert Grunderwerbsteuer)"></select>
+        <div class="ib-f ib-f--val" id="ib-grest">28.497 €</div>
+        <div></div>
+        <div class="ib-f ib-f--pct" id="ib-grest-satz">3,5 %</div>
+      </div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Beratungshonorar</div>
+        <div class="ib-f ib-f--val" id="ib-beratungshonorar">-&nbsp;&nbsp;&nbsp;&nbsp;€</div>
+        <div></div>
+        <div class="ib-f ib-in ib-f--pct" id="ib-beratungshonorar-satz">0,0 %</div>
+      </div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Bauzeitzinsen (nach Steuern)</div>
+        <div class="ib-f ib-f--val" id="ib-bauzeitzinsen">14.818 €</div>
+        <div></div>
+        <div class="ib-f ib-in ib-f--pct" id="ib-bauzeitzinsen-satz">3,5 %</div>
+      </div>
+
+      <div class="ib-r ib-sum">
+        <div class="ib-sum-line">
+          <div class="ib-lbl">Kaufpreis inkl. NK</div>
+          <div class="ib-f ib-f--val" id="ib-kaufpreis-inkl-nk">873.791 €</div>
+        </div>
+      </div>
+
+    </div><!-- /col l -->
+
+    <div class="ib-gap"></div>
+
+    <div class="ib-col ib-col--r">
+
+      <div class="ib-r ib-r--hdr"><div class="ib-h">Miete</div></div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Kaltmiete p.m./m²</div>
+        <div class="ib-f ib-f--val" id="ib-kaltmiete-pm">1.833 €</div>
+        <div></div>
+        <div class="ib-f ib-in ib-f--val" id="ib-kaltmiete-qm">17,00 €</div>
+      </div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Miete Stellplatz p.m.</div>
+        <div class="ib-f ib-in ib-f--val" id="ib-miete-stellplatz">&nbsp;</div>
+      </div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Hausverwaltung p.m.</div>
+        <div class="ib-f ib-in ib-f--val" id="ib-hausverwaltung">63,00 €</div>
+      </div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Mietsteigerung p.a.</div>
+        <div class="ib-f ib-in ib-f--pct" id="ib-mietsteigerung">2,0 %</div>
+      </div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Rücklage p.a.</div>
+        <div class="ib-f ib-in ib-f--val" id="ib-ruecklage">765,66 €</div>
+      </div>
+
+      <div class="ib-r ib-r--spacer"></div>
+
+      <div class="ib-r ib-r--hdr"><div class="ib-h">Abschreibung</div></div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Bodenanteil</div>
+        <div class="ib-f ib-f--val" id="ib-bodenanteil">42.949 €</div>
+        <div></div>
+        <div class="ib-f ib-in ib-f--pct" id="ib-bodenanteil-satz">5,0 %</div>
+      </div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Altsubstanz</div>
+        <div class="ib-f ib-f--val" id="ib-altsubstanz">171.795 €</div>
+        <div></div>
+        <div class="ib-f ib-in ib-f--pct" id="ib-altsubstanz-satz">20,0 %</div>
+      </div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Sanierungsanteil<button type="button" class="ib-info" aria-label="Erklärung anzeigen"
+            data-t="Erhöhte Absetzung nach § 7i EStG"
+            data-f="Jahr 1–8:&#10;644.229 € × 9 % = 57.981 € pro Jahr&#10;&#10;Jahr 9–12:&#10;644.229 € × 7 % = 45.096 € pro Jahr"
+            data-k="Bemessungsgrundlage ist der Sanierungsanteil von 75&nbsp;% aus Kaufpreis + Notarkosten + Grunderwerbsteuer (858.973 €) – die Kaufnebenkosten werden also anteilig mit abgeschrieben. 8&nbsp;×&nbsp;9&nbsp;% + 4&nbsp;×&nbsp;7&nbsp;% ergeben 100&nbsp;%: nach zwölf Jahren ist der Sanierungsanteil vollständig abgesetzt. Bei Objekten in Sanierungsgebieten gilt § 7h EStG entsprechend.">i</button></div>
+        <div class="ib-f ib-f--val" id="ib-sanierungsanteil">644.229 €</div>
+        <div></div>
+        <div class="ib-f ib-f--pct" id="ib-sanierungsanteil-satz">75,0 %</div>
+      </div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Abschreibung Altsubstanz</div>
+        <div></div>
+        <div></div>
+        <div class="ib-f ib-f--pct" id="ib-afa-altsubstanz">2,0 %</div>
+      </div>
+
+    </div><!-- /col r -->
+  </div>
+
+  <!-- ---------- KUNDENDATEN ---------- -->
+  <div class="ib-bar" style="margin-top:calc(11.5pt * var(--ib-luft))">Kundendaten</div>
+
+  <div class="ib-cols">
+    <div class="ib-col ib-col--l">
+
+      <div class="ib-r ib-r--grp"><div class="ib-h">Einkommen</div></div>
+
+      <div class="ib-r ib-r--wide">
+        <div class="ib-lbl">Name</div>
+        <div class="ib-f ib-in ib-f--ctr" id="ib-name">Herr Dr. Piorkowski</div>
+      </div>
+
+      <div class="ib-r ib-r--wide">
+        <div class="ib-lbl">ZVE p.a.</div>
+        <div class="ib-f ib-in ib-f--ctr" id="ib-zve-1-4">500.000 €</div>
+      </div>
+
+      <div class="ib-r ib-r--wide">
+        <div class="ib-lbl">Splitting</div>
+        <div class="ib-f ib-in ib-f--ctr" id="ib-splitting">Ja</div>
+      </div>
+
+      <div class="ib-r ib-r--wide">
+        <select class="ib-f ib-in ib-f--ctr ib-sel" id="ib-kirchensteuer-label" aria-label="Kirchensteuer auswählen"></select>
+        <div class="ib-f ib-f--ctr" style="color:#000" id="ib-kirchensteuer-satz">0,0 %</div>
+      </div>
+
+    </div>
+
+    <div class="ib-gap"></div>
+
+    <div class="ib-col ib-col--r">
+      <!-- rechte Spalte der Kundendaten bewusst leer
+           (frueher: "ZVE p.a. (ab 5. Jahr)" und "Aenderung ZVE ab") -->
+    </div>
+  </div>
+
+  <!-- ---------- FINANZIERUNG ---------- -->
+  <div class="ib-bar" style="margin-top:calc(19.04pt * var(--ib-luft))">Finanzierung</div>
+
+  <div class="ib-cols">
+    <div class="ib-col ib-col--l">
+
+      <div class="ib-r ib-r--grp"><div class="ib-h">Kapitalbedarf</div></div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Kaufpreis inkl. NK</div>
+        <div class="ib-f ib-f--val" id="ib-fin-kaufpreis-inkl-nk">873.791 €</div>
+      </div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Eigenkapital</div>
+        <div class="ib-f ib-in ib-f--val" id="ib-eigenkapital">44.781 €</div>
+      </div>
+
+      <div class="ib-r ib-sum">
+        <div class="ib-sum-line">
+          <div class="ib-lbl">Fremdkapitalbedarf</div>
+          <div class="ib-f ib-f--val" id="ib-fremdkapitalbedarf">829.010 €</div>
+        </div>
+      </div>
+
+      <div class="ib-r ib-r--spacer"></div>
+      <div class="ib-r ib-r--spacer"></div>
+
+      <div class="ib-r ib-r--grp"><div class="ib-h">Hauptdarlehen</div></div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Kredithöhe</div>
+        <div class="ib-f ib-f--val" id="ib-kredithoehe">679.010 €</div>
+      </div>
+      <div class="ib-r">
+        <div class="ib-lbl">Nominalzins</div>
+        <div class="ib-f ib-in ib-f--pct" id="ib-hd-nominalzins">4,30 %</div>
+      </div>
+      <div class="ib-r">
+        <div class="ib-lbl">Anfängliche Tilgung</div>
+        <div class="ib-f ib-in ib-f--pct" id="ib-hd-tilgung">1,5 %</div>
+      </div>
+      <div class="ib-r">
+        <div class="ib-lbl ib-lbl--0">Durchschnittszins inkl. KFW</div>
+        <div class="ib-f ib-f--pct" id="ib-durchschnittszins">4,00 %</div>
+      </div>
+
+    </div>
+
+    <div class="ib-gap"></div>
+
+    <div class="ib-col ib-col--r">
+
+      <!-- Verwendung der Ueberschuesse: genau eine der beiden Moeglichkeiten.
+           Feste Hoehe, damit "KFW 261" und "Hauptdarlehen" buendig starten. -->
+      <div class="ib-fin-top">
+        <div class="ib-wahl" role="radiogroup" aria-label="Verwendung der monatlichen Überschüsse">
+
+          <div class="ib-wahl-box ib-wahl-box--an" id="ib-wahl-sondertilgung"
+               role="radio" aria-checked="true" tabindex="0">
+            <span class="ib-radio"></span>
+            <div class="ib-wahl-txt">
+              <b>Überschüsse in die Sondertilgung</b>
+              <small>Der monatliche Überschuss tilgt das Darlehen zusätzlich.</small>
+            </div>
+          </div>
+
+          <div class="ib-wahl-box" id="ib-wahl-ersatz"
+               role="radio" aria-checked="false" tabindex="-1">
+            <span class="ib-radio"></span>
+            <div class="ib-wahl-txt">
+              <b>Überschüsse in ein Tilgungsersatzinstrument</b>
+              <small>Der Überschuss wird am Kapitalmarkt angelegt statt getilgt.</small>
+              <div class="ib-wahl-feld">
+                <span>Netto-Kapitalmarktrendite</span>
+                <span class="ib-f ib-in ib-f--pct" id="ib-kapitalmarktrendite">4,00 %</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="ib-r ib-r--grp"><div class="ib-h">KFW 261</div></div>
+
+      <div class="ib-r">
+        <div class="ib-lbl">Kapitalbedarf</div>
+        <div class="ib-f ib-in ib-f--val" id="ib-kfw-kapitalbedarf">150.000 €</div>
+      </div>
+      <div class="ib-r">
+        <div class="ib-lbl">Nominalzins</div>
+        <div class="ib-f ib-in ib-f--pct" id="ib-kfw-nominalzins">2,80 %</div>
+      </div>
+      <div class="ib-r">
+        <div class="ib-lbl">Anfängliche Tilgung</div>
+        <div class="ib-f ib-in ib-f--pct" id="ib-kfw-tilgung">1,5 %</div>
+      </div>
+      <div class="ib-r">
+        <div class="ib-lbl">Tilgungszuschuß KFW 261</div>
+        <div class="ib-f ib-in ib-f--val" id="ib-kfw-tilgungszuschuss">7.500 €</div>
+      </div>
+      <div class="ib-r">
+        <div class="ib-lbl">KFW Zuschuss (flexibel)</div>
+        <div class="ib-f ib-in ib-f--val" id="ib-kfw-zuschuss-flex">&nbsp;</div>
+      </div>
+
+    </div>
+  </div>
+
+
+
+<!-- ======================================================================
+     ABSCHNITT 2 : ÜBERSICHT FINANZIERUNG (12 Jahre)
+     ====================================================================== -->
+</section>
+</div></div>
+
+<div class="ib-sheet ib-sheet--quer"><div class="ib-sheet-in">
+<section class="ib-page ib-page--wide" id="ib-abschnitt-2">
+
+  <div class="ib-title" style="padding-bottom:18.04pt">Abschnitt 2: Übersicht Finanzierung</div>
+
+  <div class="ib-swipehint" aria-hidden="true">
+    <svg width="17" height="12" viewBox="0 0 17 12" fill="none">
+      <path d="M4.6 1.2 1.2 6l3.4 4.8M12.4 1.2 15.8 6l-3.4 4.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>Nach links wischen für die Jahre 1–12</span>
+  </div>
+
+  <div class="ib-tblwrap" tabindex="0" role="region" aria-label="Übersicht Finanzierung Jahr 1 bis 12">
+  <table class="ib-tbl" id="ib-tabelle-12jahre">
+    <colgroup>
+      <col class="ib-c-lbl">
+      <col class="ib-c-y"><col class="ib-c-y"><col class="ib-c-y"><col class="ib-c-y">
+      <col class="ib-c-y"><col class="ib-c-y"><col class="ib-c-y"><col class="ib-c-y">
+      <col class="ib-c-y"><col class="ib-c-y"><col class="ib-c-y"><col class="ib-c-y">
+    </colgroup>
+    <thead>
+      <tr>
+        <th class="ib-t-lbl" scope="col">Jahr</th>
+        <th class="ib-t-v" scope="col">1</th><th class="ib-t-v" scope="col">2</th>
+        <th class="ib-t-v" scope="col">3</th><th class="ib-t-v" scope="col">4</th>
+        <th class="ib-t-v" scope="col">5</th><th class="ib-t-v" scope="col">6</th>
+        <th class="ib-t-v" scope="col">7</th><th class="ib-t-v" scope="col">8</th>
+        <th class="ib-t-v" scope="col">9</th><th class="ib-t-v" scope="col">10</th>
+        <th class="ib-t-v" scope="col">11</th><th class="ib-t-v" scope="col">12</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      <tr class="ib-band"><td class="ib-t-lbl" colspan="13"><span class="ib-stick">GUV Rechnung</span></td></tr>
+
+      <tr id="ib-z1"><td class="ib-t-lbl"><span class="ib-lang">1) ZVE vor Investition</span><span class="ib-kurz">1) ZVE vorher</span></td>
+        <td class="ib-t-v">500.000</td><td class="ib-t-v">500.000</td><td class="ib-t-v">500.000</td><td class="ib-t-v">500.000</td>
+        <td class="ib-t-v">500.000</td><td class="ib-t-v">500.000</td><td class="ib-t-v">500.000</td><td class="ib-t-v">500.000</td>
+        <td class="ib-t-v">500.000</td><td class="ib-t-v">500.000</td><td class="ib-t-v">500.000</td><td class="ib-t-v">500.000</td></tr>
+
+      <tr id="ib-z2"><td class="ib-t-lbl">2) Nettokaltmiete<button type="button" class="ib-info" aria-label="Formel anzeigen"
+        data-t="Formel für den Wert Nettokaltmiete"
+        data-f="Zeile 2 = Kaltmiete p.a. &#8722; Hausverwaltung p.a.&#10;&#10;Jahr 1: 1.833 € × 12 = 21.996 €&#10;abzüglich 63 € × 12 = 756 €"
+        data-k="Die Kosten der Hausverwaltung sind hier bereits abgezogen. Zeile 2 zeigt also die Miete, die tatsächlich beim Eigentümer ankommt, nicht die vereinbarte Kaltmiete. Die Instandhaltungsrücklage ist dagegen nicht enthalten &#8211; sie steht separat in Zeile 14. Ab dem zweiten Jahr wächst der Betrag um die oben eingestellte Mietsteigerung p.a.">i</button></td>
+        <td class="ib-t-v">21.243</td><td class="ib-t-v">21.668</td><td class="ib-t-v">22.102</td><td class="ib-t-v">22.544</td>
+        <td class="ib-t-v">22.994</td><td class="ib-t-v">23.454</td><td class="ib-t-v">23.923</td><td class="ib-t-v">24.402</td>
+        <td class="ib-t-v">24.890</td><td class="ib-t-v">25.388</td><td class="ib-t-v">25.896</td><td class="ib-t-v">26.413</td></tr>
+
+      <tr id="ib-z3"><td class="ib-t-lbl">3) Zinsen</td>
+        <td class="ib-t-v">-32.957</td><td class="ib-t-v">-32.116</td><td class="ib-t-v">-31.246</td><td class="ib-t-v">-30.345</td>
+        <td class="ib-t-v">-29.412</td><td class="ib-t-v">-28.446</td><td class="ib-t-v">-27.447</td><td class="ib-t-v">-26.413</td>
+        <td class="ib-t-v">-25.343</td><td class="ib-t-v">-24.486</td><td class="ib-t-v">-23.598</td><td class="ib-t-v">-22.676</td></tr>
+
+      <tr id="ib-z4"><td class="ib-t-lbl">4) AfA Altsubstanz</td>
+        <td class="ib-t-v">-3.436</td><td class="ib-t-v">-3.436</td><td class="ib-t-v">-3.436</td><td class="ib-t-v">-3.436</td>
+        <td class="ib-t-v">-3.436</td><td class="ib-t-v">-3.436</td><td class="ib-t-v">-3.436</td><td class="ib-t-v">-3.436</td>
+        <td class="ib-t-v">-3.436</td><td class="ib-t-v">-3.436</td><td class="ib-t-v">-3.436</td><td class="ib-t-v">-3.436</td></tr>
+
+      <tr id="ib-z5"><td class="ib-t-lbl"><span class="ib-lang">5) AfA Sanierungsanteil</span><span class="ib-kurz">5) AfA Sanierung</span></td>
+        <td class="ib-t-v">-57.981</td><td class="ib-t-v">-57.981</td><td class="ib-t-v">-57.981</td><td class="ib-t-v">-57.981</td>
+        <td class="ib-t-v">-57.981</td><td class="ib-t-v">-57.981</td><td class="ib-t-v">-57.981</td><td class="ib-t-v">-57.981</td>
+        <td class="ib-t-v">-45.096</td><td class="ib-t-v">-45.096</td><td class="ib-t-v">-45.096</td><td class="ib-t-v">-45.096</td></tr>
+
+      <tr class="ib-trsum" id="ib-z6"><td class="ib-t-lbl"><span class="ib-lang">6) steuerliche Verluste</span><span class="ib-kurz">6) Steuerl. Verlust</span><button type="button" class="ib-info" aria-label="Formel anzeigen" data-t="Formel für den Wert steuerliche Verluste" data-f="Zeile 6 = Zeile 2 + Zeile 3 + Zeile 4 + Zeile 5" data-k="Nettokaltmiete + Zinsen + AfA Altsubstanz + AfA Sanierungsanteil">i</button></td>
+        <td class="ib-t-v">-73.130</td><td class="ib-t-v">-71.865</td><td class="ib-t-v">-70.561</td><td class="ib-t-v">-69.218</td>
+        <td class="ib-t-v">-67.834</td><td class="ib-t-v">-66.409</td><td class="ib-t-v">-64.940</td><td class="ib-t-v">-63.427</td>
+        <td class="ib-t-v">-48.985</td><td class="ib-t-v">-47.630</td><td class="ib-t-v">-46.234</td><td class="ib-t-v">-44.795</td></tr>
+
+      <tr><td class="ib-t-lbl" colspan="13" style="height:14.9pt">&nbsp;</td></tr>
+
+      <tr class="ib-band"><td class="ib-t-lbl" colspan="13"><span class="ib-stick">Steuern</span></td></tr>
+
+      <tr id="ib-z7"><td class="ib-t-lbl"><span class="ib-lang">7) ZVE nach Investition</span><span class="ib-kurz">7) ZVE nachher</span></td>
+        <td class="ib-t-v">426.870</td><td class="ib-t-v">428.135</td><td class="ib-t-v">429.439</td><td class="ib-t-v">430.782</td>
+        <td class="ib-t-v">432.166</td><td class="ib-t-v">433.591</td><td class="ib-t-v">435.060</td><td class="ib-t-v">436.573</td>
+        <td class="ib-t-v">451.015</td><td class="ib-t-v">452.370</td><td class="ib-t-v">453.766</td><td class="ib-t-v">455.205</td></tr>
+
+      <tr id="ib-z8"><td class="ib-t-lbl"><span class="ib-lang">8) ESt. vor Investition</span><span class="ib-kurz">8) ESt. vorher</span></td>
+        <td class="ib-t-v">188.796</td><td class="ib-t-v">188.796</td><td class="ib-t-v">188.796</td><td class="ib-t-v">188.796</td>
+        <td class="ib-t-v">188.796</td><td class="ib-t-v">188.796</td><td class="ib-t-v">188.796</td><td class="ib-t-v">188.796</td>
+        <td class="ib-t-v">188.796</td><td class="ib-t-v">188.796</td><td class="ib-t-v">188.796</td><td class="ib-t-v">188.796</td></tr>
+
+      <tr id="ib-z9"><td class="ib-t-lbl"><span class="ib-lang">9) ESt. nach Investition</span><span class="ib-kurz">9) ESt. nachher</span></td>
+        <td class="ib-t-v">158.081</td><td class="ib-t-v">158.613</td><td class="ib-t-v">159.160</td><td class="ib-t-v">159.724</td>
+        <td class="ib-t-v">160.305</td><td class="ib-t-v">160.904</td><td class="ib-t-v">161.521</td><td class="ib-t-v">162.156</td>
+        <td class="ib-t-v">168.222</td><td class="ib-t-v">168.791</td><td class="ib-t-v">169.377</td><td class="ib-t-v">169.982</td></tr>
+
+      <tr id="ib-z10"><td class="ib-t-lbl">10) Steuerersparnis</td>
+        <td class="ib-t-v">30.715</td><td class="ib-t-v">30.183</td><td class="ib-t-v">29.636</td><td class="ib-t-v">29.072</td>
+        <td class="ib-t-v">28.490</td><td class="ib-t-v">27.892</td><td class="ib-t-v">27.275</td><td class="ib-t-v">26.639</td>
+        <td class="ib-t-v">20.574</td><td class="ib-t-v">20.005</td><td class="ib-t-v">19.418</td><td class="ib-t-v">18.814</td></tr>
+
+      <tr id="ib-z11"><td class="ib-t-lbl">11) Ersparnis Soli</td>
+        <td class="ib-t-v">1.689</td><td class="ib-t-v">1.660</td><td class="ib-t-v">1.630</td><td class="ib-t-v">1.599</td>
+        <td class="ib-t-v">1.567</td><td class="ib-t-v">1.534</td><td class="ib-t-v">1.500</td><td class="ib-t-v">1.465</td>
+        <td class="ib-t-v">1.132</td><td class="ib-t-v">1.100</td><td class="ib-t-v">1.068</td><td class="ib-t-v">1.035</td></tr>
+
+      <tr id="ib-z12"><td class="ib-t-lbl"><span class="ib-lang">12) Ersparnis Kirchensteuer</span><span class="ib-kurz">12) Ersparnis KiSt.</span></td>
+        <td class="ib-t-v">0</td><td class="ib-t-v">0</td><td class="ib-t-v">0</td><td class="ib-t-v">0</td>
+        <td class="ib-t-v">0</td><td class="ib-t-v">0</td><td class="ib-t-v">0</td><td class="ib-t-v">0</td>
+        <td class="ib-t-v">0</td><td class="ib-t-v">0</td><td class="ib-t-v">0</td><td class="ib-t-v">0</td></tr>
+
+      <tr class="ib-trsum" id="ib-z13"><td class="ib-t-lbl"><span class="ib-lang">13) Steuerersparnis insg.</span><span class="ib-kurz">13) Steuerersp. ges.</span></td>
+        <td class="ib-t-v">32.404</td><td class="ib-t-v">31.843</td><td class="ib-t-v">31.266</td><td class="ib-t-v">30.670</td>
+        <td class="ib-t-v">30.057</td><td class="ib-t-v">29.426</td><td class="ib-t-v">28.775</td><td class="ib-t-v">28.105</td>
+        <td class="ib-t-v">21.705</td><td class="ib-t-v">21.105</td><td class="ib-t-v">20.486</td><td class="ib-t-v">19.849</td></tr>
+
+      <tr><td class="ib-t-lbl" colspan="13" style="height:15.4pt">&nbsp;</td></tr>
+
+      <tr class="ib-band"><td class="ib-t-lbl" colspan="13"><span class="ib-stick">Geldfluss</span></td></tr>
+
+      <tr id="ib-z14"><td class="ib-t-lbl"><span class="ib-lang">14) Instandhaltungsrücklage</span><span class="ib-kurz">14) Instandh.-Rückl.</span></td>
+        <td class="ib-t-v">-766</td><td class="ib-t-v">-766</td><td class="ib-t-v">-766</td><td class="ib-t-v">-766</td>
+        <td class="ib-t-v">-766</td><td class="ib-t-v">-766</td><td class="ib-t-v">-766</td><td class="ib-t-v">-766</td>
+        <td class="ib-t-v">-766</td><td class="ib-t-v">-766</td><td class="ib-t-v">-766</td><td class="ib-t-v">-766</td></tr>
+
+      <tr class="ib-trsum" id="ib-z15"><td class="ib-t-lbl"><span class="ib-lang">15) Liquiditätsüberschuss</span><span class="ib-kurz">15) Liquidität</span><button type="button" class="ib-info" aria-label="Formel anzeigen" data-t="Formel für den Wert Liquiditätsüberschuss" data-f="Zeile 15 = Zeile 2 + Zeile 3 + Zeile 13 + Zeile 14" data-k="Nettokaltmiete + Zinsen + Steuerersparnis insg. + Instandhaltungsrücklage">i</button></td>
+        <td class="ib-t-v">19.925</td><td class="ib-t-v">20.629</td><td class="ib-t-v">21.355</td><td class="ib-t-v">22.103</td>
+        <td class="ib-t-v">22.874</td><td class="ib-t-v">23.668</td><td class="ib-t-v">24.486</td><td class="ib-t-v">25.328</td>
+        <td class="ib-t-v">20.487</td><td class="ib-t-v">21.241</td><td class="ib-t-v">22.018</td><td class="ib-t-v">22.820</td></tr>
+
+      <tr><td class="ib-t-lbl" colspan="13" style="height:14.9pt">&nbsp;</td></tr>
+
+      <tr class="ib-band"><td class="ib-t-lbl" colspan="13"><span class="ib-stick">Fremdkapital</span></td></tr>
+
+      <tr id="ib-z16"><td class="ib-t-lbl">16) Anfang</td>
+        <td class="ib-t-v">821.510</td><td class="ib-t-v">801.585</td><td class="ib-t-v">780.956</td><td class="ib-t-v">759.601</td>
+        <td class="ib-t-v">737.497</td><td class="ib-t-v">714.623</td><td class="ib-t-v">690.955</td><td class="ib-t-v">666.469</td>
+        <td class="ib-t-v">641.141</td><td class="ib-t-v">620.654</td><td class="ib-t-v">599.413</td><td class="ib-t-v">577.395</td></tr>
+
+      <tr id="ib-z17"><td class="ib-t-lbl">17) Tilgung<button type="button" class="ib-info" aria-label="Formel anzeigen" data-t="Formel für den Wert Tilgung" data-f="Zeile 17 = Annuität − Zeile 3" data-k="Vertraglich vereinbarte Pflichttilgung aus der Annuität von Hauptdarlehen und KfW-Darlehen abzüglich der Zinsen.">i</button></td>
+        <td class="ib-t-v">12.876</td><td class="ib-t-v">13.717</td><td class="ib-t-v">14.587</td><td class="ib-t-v">15.488</td>
+        <td class="ib-t-v">16.421</td><td class="ib-t-v">17.387</td><td class="ib-t-v">18.386</td><td class="ib-t-v">19.420</td>
+        <td class="ib-t-v">20.487</td><td class="ib-t-v">21.241</td><td class="ib-t-v">22.018</td><td class="ib-t-v">22.834</td></tr>
+
+      <tr id="ib-z18"><td class="ib-t-lbl">18) <span class="ib-lang" id="ib-z18-name">Sondertilgung</span><span class="ib-kurz" id="ib-z18-kurz">Sondertilgung</span><button type="button" class="ib-info" aria-label="Formel anzeigen"
+            data-t="Formel für den Wert Sondertilgung"
+            data-f="Zeile 18 = max(Zeile 15 − Zeile 17; 0)"
+            data-k="Der Teil des Liquiditätsüberschusses, der über die Pflichttilgung hinausgeht. Ab Jahr 9 sinkt die Sanierungs-AfA, dadurch reicht der Überschuss nur noch für die Pflichttilgung.">i</button></td>
+        <td class="ib-t-v">7.049</td><td class="ib-t-v">6.912</td><td class="ib-t-v">6.768</td><td class="ib-t-v">6.615</td>
+        <td class="ib-t-v">6.453</td><td class="ib-t-v">6.281</td><td class="ib-t-v">6.100</td><td class="ib-t-v">5.908</td>
+        <td class="ib-t-v">0</td><td class="ib-t-v">0</td><td class="ib-t-v">0</td><td class="ib-t-v">0</td></tr>
+
+      <tr class="ib-trsum" id="ib-z19"><td class="ib-t-lbl">19) Ende<button type="button" class="ib-info" aria-label="Formel anzeigen"
+            data-t="Formel für den Wert Ende"
+            data-f="Zeile 19 = Zeile 16 − Zeile 17 − Zeile 18"
+            data-k="Restschuld am Jahresende: Stand zu Jahresbeginn abzüglich Pflichttilgung und Sondertilgung.">i</button></td>
+        <td class="ib-t-v">801.585</td><td class="ib-t-v">780.956</td><td class="ib-t-v">759.601</td><td class="ib-t-v">737.497</td>
+        <td class="ib-t-v">714.623</td><td class="ib-t-v">690.955</td><td class="ib-t-v">666.469</td><td class="ib-t-v">641.141</td>
+        <td class="ib-t-v">620.654</td><td class="ib-t-v">599.413</td><td class="ib-t-v">577.395</td><td class="ib-t-v">554.561</td></tr>
+
+    </tbody>
+  </table>
+  </div>
+
+
+
+
+
+<!-- ======================================================================
+     ABSCHNITT 3 : MONATSEBENE
+     ====================================================================== -->
+</section>
+</div></div>
+
+<div class="ib-sheet ib-sheet--hoch"><div class="ib-sheet-in">
+<section class="ib-page" id="ib-abschnitt-3">
+
+  <div class="ib-title" style="padding-bottom:32.4pt">Abschnitt 3: Monatsebene</div>
+
+  <div class="ib-p3">
+
+    <div class="ib-bar3">Monatliche Liquiditätsrechnung</div>
+
+    <div style="height:15.5pt"></div>
+
+    <div class="ib-zeitraum-h">
+      <div style="padding-left:9.3pt;font-weight:700">Betrachtungszeitraum</div>
+      <div></div>
+    </div>
+
+    <div class="ib-zeitraum-r">
+      <div style="padding-left:9.1pt">Jahr I Monat</div>
+      <div class="ib-f ib-in ib-f--ctr" style="height:calc(var(--ib-box-h) + 1.5pt);line-height:calc(var(--ib-box-h) + 0.5pt)" id="ib-monat-jahr">1. Jahr</div>
+      <div></div>
+      <div class="ib-f ib-in ib-f--ctr" style="height:calc(var(--ib-box-h) + 1.5pt);line-height:calc(var(--ib-box-h) + 0.5pt)" id="ib-monat-monat">Jan</div>
+      <div class="ib-white" id="ib-monat-zeitraum">01.01.2027&nbsp;&nbsp;&nbsp;&nbsp;bis&nbsp;&nbsp;&nbsp;&nbsp;31.01.2027</div>
+    </div>
+
+    <div style="height:8.8pt"></div>
+
+    <div class="ib-m-cols">
+
+      <!-- ---- linke Spalte: Steuerberechnung ---- -->
+      <div class="ib-m-col ib-m-col--l">
+        <div class="ib-subbar">Steuerberechnung <span>monatlich</span></div>
+
+        <div class="ib-m-r"><div class="ib-m-lbl" style="font-weight:700">Einnahmen</div></div>
+
+        <div class="ib-m-r">
+          <div class="ib-m-lbl--i">+ Nettokaltmiete</div>
+          <div class="ib-m-f ib-out" id="ib-m-nettokaltmiete">+1.806 €</div>
+        </div>
+
+        <div class="ib-m-r"></div>
+
+        <div class="ib-m-r"><div class="ib-m-lbl" style="font-weight:700">Ausgaben</div></div>
+
+        <div class="ib-m-r">
+          <div class="ib-m-lbl--i">- Zinsen</div>
+          <div class="ib-m-f ib-out" id="ib-m-zinsen">-2.766 €</div>
+        </div>
+
+        <div class="ib-m-r">
+          <div class="ib-m-lbl--i">- Abschreibung</div>
+          <div class="ib-m-f ib-out" id="ib-m-abschreibung">-5.118 €</div>
+        </div>
+
+        <div class="ib-m-r">
+          <div class="ib-m-lbl--b">Steuerlicher Verlust</div>
+          <div class="ib-m-f ib-out" id="ib-m-verlust">-6.078 €</div>
+        </div>
+
+        <div class="ib-m-gap"></div>
+
+        <div class="ib-resband">
+          <div class="ib-resttl">
+            <b>Steuerersparnis</b>
+            <small>= Steuerlicher Verlust × Grenzsteuersatz</small>
+          </div>
+          <div class="ib-m-f ib-out--dk ib-m-f--tall" id="ib-m-steuerersparnis">+2.700 €</div>
+        </div>
+      </div>
+
+      <div class="ib-gap"></div>
+
+      <!-- ---- rechte Spalte: Liquiditätsberechnung ---- -->
+      <div class="ib-m-col ib-m-col--r">
+        <div class="ib-subbar">Liqiditätsberechnung <span>monatlich</span></div>
+
+        <div class="ib-m-r"><div class="ib-m-lbl" style="font-weight:700">Einnahmen</div></div>
+
+        <div class="ib-m-r">
+          <div class="ib-m-lbl--i">+ Miete</div>
+          <div class="ib-m-f ib-out" id="ib-l-miete">+1.806 €</div>
+        </div>
+
+        <div class="ib-m-r">
+          <div class="ib-m-lbl--i">+ Steuerersparnis</div>
+          <div class="ib-m-f ib-out--dk" id="ib-l-steuerersparnis">+2.700 €</div>
+        </div>
+
+        <div class="ib-m-r"><div class="ib-m-lbl" style="font-weight:700">Ausgaben</div></div>
+
+        <div class="ib-m-r ib-m-r--z">
+          <div class="ib-m-lbl--i">- Zinsen</div>
+          <div class="ib-m-f ib-out ib-zins" id="ib-l-zinssatz">4,0%</div>
+          <div></div>
+          <div class="ib-m-f ib-out" id="ib-l-zinsen">-2.766 €</div>
+        </div>
+
+        <div class="ib-m-r">
+          <div class="ib-m-lbl--i">- Tilgung</div>
+          <div class="ib-m-f ib-out" id="ib-l-tilgung">-1.027 €</div>
+        </div>
+
+        <div class="ib-m-r">
+          <div class="ib-m-lbl--i">- Instandhaltung</div>
+          <div class="ib-m-f ib-out" id="ib-l-instandhaltung">-64 €</div>
+        </div>
+
+        <div class="ib-m-gap"></div>
+
+        <div class="ib-resband ib-resband--r">
+          <div class="ib-resttl" style="padding-left:13.2pt">
+            <b style="font-size:12pt">+Überschuss / -Zuzahlung</b>
+          </div>
+          <div class="ib-m-f ib-out--green ib-m-f--tall" id="ib-l-ueberschuss">+650 €</div>
+        </div>
+      </div>
+
+      <!-- roter Verbindungspfeil (nur Desktop, waechst mit --ib-luft mit) -->
+      <div class="ib-arrow" aria-hidden="true">
+        <span class="ib-arrow-u"></span>
+        <span class="ib-arrow-v"></span>
+        <span class="ib-arrow-o"></span>
+        <span class="ib-arrow-s"></span>
+      </div>
+    </div>
+
+    <div class="ib-hint" id="ib-ueberschuss-hint">Der gesamte monatliche Überschuss fließt in die<br>Sondertilgung</div>
+
+    <div style="height:17.5pt"></div>
+
+    <div class="ib-bar3">Ergebnis der Investition</div>
+
+    <div style="height:18.1pt"></div>
+
+    <div class="ib-ergwrap">
+      <div class="ib-erg-h">Ergebnis nach 12 Jahren</div>
+
+      <div class="ib-erg">
+
+        <!-- ---- Tortendiagramm mit Beschriftung aussen ---- -->
+        <div class="ib-diagramm">
+          <div class="ib-piewrap">
+            <svg class="ib-pie" viewBox="-12 0 320 218" role="img"
+                 aria-label="Ergebnis nach 12 Jahren: Restschuld 53 Prozent, Steuerersparnis 31 Prozent, Wertsteigerung 15 Prozent, Mietüberhang minus 5 Prozent, Eigenkapital anfänglich eingebracht 4 Prozent, KFW-Zuschuss 1 Prozent">
+              <defs>
+                <linearGradient id="ib-g-rest" x1="0" y1="0" x2="0.35" y2="1">
+                  <stop offset="0" stop-color="#B6D3EC"/><stop offset="1" stop-color="#CDE1F2"/>
+                </linearGradient>
+                <linearGradient id="ib-g-steuer" x1="0" y1="1" x2="0.3" y2="0">
+                  <stop offset="0" stop-color="#94ADDC"/><stop offset="1" stop-color="#5B80C9"/>
+                </linearGradient>
+                <linearGradient id="ib-g-wert" x1="0" y1="1" x2="0.4" y2="0">
+                  <stop offset="0" stop-color="#9DC783"/><stop offset="1" stop-color="#86B867"/>
+                </linearGradient>
+                <linearGradient id="ib-g-miet" x1="0" y1="0" x2="0.4" y2="1">
+                  <stop offset="0" stop-color="#FFC947"/><stop offset="1" stop-color="#FFD25F"/>
+                </linearGradient>
+                <linearGradient id="ib-g-ek" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#E6E5E5"/><stop offset="1" stop-color="#DEDDDD"/>
+                </linearGradient>
+                <linearGradient id="ib-g-kfw" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#2F5597"/><stop offset="1" stop-color="#3E6BB3"/>
+                </linearGradient>
+              </defs>
+              <!-- Mittelpunkt 142/100, Radius 48 – Segmente im Uhrzeigersinn ab 12 Uhr -->
+              <g id="ib-pie-linien" stroke="#A8A8A8" stroke-width="0.55" fill="none" stroke-linejoin="round" stroke-linecap="round"></g>
+              <g id="ib-pie-slices" stroke="#FFFFFF" stroke-width="1.6" stroke-linejoin="round"></g>
+              <g id="ib-pie-texte" font-size="12" fill="#000"></g>
+            </svg>
+          </div>
+        </div>
+
+        <!-- ---- Kennzahlen ---- -->
+        <div class="ib-kpi">
+          <div class="ib-kpi-row">
+            <div class="ib-kpi-t">
+              <b>Netto-Eigenkapital-Rentabilität p.a.<button type="button" class="ib-info" aria-label="Formel anzeigen" data-t="Formel für den Wert Netto-Eigenkapital-Rentabilität p.a." data-f="Netto-EK-Rentabilität p.a. = (1 + Netto-EK-Rentabilität) ^ (1/12) − 1 = 20,48 % p.a." data-k="Die Gesamtrendite von 835,30 % über zwölf Jahre, umgerechnet auf eine durchschnittliche Rendite pro Jahr.">i</button></b>
+              <small>Durchschnittliche Netto-Eigenkapital-Rentabilität p.a.</small>
+            </div>
+            <div class="ib-kpi-v ib-out--res" id="ib-kpi-ekr-pa">20,48%</div>
+          </div>
+
+          <div class="ib-kpi-row">
+            <div class="ib-kpi-t">
+              <b>Brutto-Mietrendite p.a.<button type="button" class="ib-info" aria-label="Formel anzeigen" data-t="Formel für den Wert Brutto-Mietrendite p.a." data-f="Brutto-Mietrendite = Kaltmiete p.a. / Kaufpreis = 2,70 % p.a." data-k="Jahreskaltmiete im Verhältnis zum Kaufpreis der Einheit – ohne Nebenkosten, Steuern und Finanzierung.">i</button></b>
+              <small>Kaltmiete p.a. / Kaufpreis</small>
+            </div>
+            <div class="ib-kpi-v ib-out--res" id="ib-kpi-mietrendite">2,70%</div>
+          </div>
+
+          <div class="ib-kpi-row">
+            <div class="ib-kpi-t">
+              <b>Netto-Eigenkapital Rentabilität<button type="button" class="ib-info" aria-label="Formel anzeigen" data-t="Formel für den Wert Netto-Eigenkapital Rentabilität" data-f="Netto-EK-Rentabilität = Netto-Rendite / (44.781 € + 0,5 × 14 €) = 835,30 %" data-k="Monatlich eingebrachtes Eigenkapital wird nur zur Hälfte berücksichtigt (Näherung), da es nicht über die vollen zwölf Jahre gebunden ist.">i</button></b>
+              <small>Netto-Rendite / gebundenes Eigenkapital</small>
+            </div>
+            <div class="ib-kpi-v ib-out--res" id="ib-kpi-ekr">835,30%</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ib-fazit" id="ib-nettorendite">
+        <div class="ib-fazit-txt">
+          <b>Netto-Rendite nach 12 Jahren</b>
+          <span>814.192 €&nbsp;+ 159.271 €&nbsp;− 554.561 €&nbsp;− 44.781 €&nbsp;− 14 €</span>
+        </div>
+        <div class="ib-fazit-wert">374.107 €</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+</div></div>
+
+</div><!-- /ib-sheets -->
+
+<!-- gemeinsames Popup-Fenster fuer alle Formel-Symbole -->
+  <div class="ib-tip" id="ib-tip" role="tooltip" aria-hidden="true">
+    <div class="ib-tip-t"></div>
+    <div class="ib-tip-f"></div>
+    <div class="ib-tip-k"></div>
+    <span class="ib-tip-pfeil"></span>
+  </div>
+
+  <!-- gefuehrte Einstiegshinweise -->
+  <div class="ib-tour" id="ib-tour" aria-hidden="true">
+    <div class="ib-tour-kopf">
+      <span class="ib-tour-nr" id="ib-tour-nr"></span>
+      <button type="button" class="ib-tour-zu" id="ib-tour-zu" aria-label="Hinweise schließen">×</button>
+    </div>
+    <div class="ib-tour-t" id="ib-tour-t"></div>
+    <div class="ib-tour-b" id="ib-tour-b"></div>
+    <div class="ib-tour-fuss">
+      <span class="ib-tour-punkte" id="ib-tour-punkte" aria-hidden="true"></span>
+      <button type="button" class="ib-tour-btn" id="ib-tour-weiter">Weiter</button>
+    </div>
+    <span class="ib-tour-pfeil"></span>
+  </div>
+
+  <!-- ===================================================================
+       ERKLAERVIDEO – verschiebbares Fenster
+       Zum Einbinden des echten Videos die Platzhalterflaeche ersetzen:
+
+         <video class="ib-video-player" controls playsinline
+                poster="vorschaubild.jpg">
+           <source src="erklaervideo.mp4" type="video/mp4">
+         </video>
+
+       oder ein eingebettetes Video:
+
+         <iframe class="ib-video-player" src="https://…" allowfullscreen
+                 title="Erklärvideo" style="border:0"></iframe>
+       =================================================================== -->
+  <div class="ib-video" id="ib-video" aria-hidden="true" role="dialog" aria-label="Erklärvideo">
+    <div class="ib-video-kopf" id="ib-video-griff">
+      <span class="ib-video-titel">So funktioniert die Berechnung</span>
+      <button type="button" class="ib-video-zu" id="ib-video-zu" aria-label="Video schließen">×</button>
+    </div>
+
+    <div class="ib-video-flaeche" id="ib-video-flaeche">
+      <div class="ib-video-platzhalter" id="ib-video-platzhalter">
+        <button type="button" class="ib-video-play" id="ib-video-play" aria-label="Video abspielen">
+          <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6L19 12z" fill="currentColor"/></svg>
+        </button>
+        <span class="ib-video-hinweis" id="ib-video-hinweis">Platzhalter – hier wird Ihr Video eingebunden</span>
+      </div>
+    </div>
+
+    <div class="ib-video-fuss">
+      <span>Kurzes Erklärvideo</span>
+      <span class="ib-video-dauer">ca. 2 Min.</span>
+    </div>
+  </div>
+
+</div><!-- /ib-doc -->
+
+<script>
+/* =========================================================================
+   PROJEKT- UND EINHEITENAUSWAHL
+   -------------------------------------------------------------------------
+   >>> PLATZHALTER – hier die echten Projekte und Einheiten eintragen. <<<
+   Reihenfolge zaehlt: beim Wechsel des Projekts wird automatisch die
+   ERSTE Einheit der Liste ausgewaehlt.
+   ========================================================================= */
+var IB_PROJEKTE = [
+  { name: "Nürnberg",  einheiten: ["114-A2-2", "114-A2-1", "113-A2-2", "112-A1-1"] },
+  { name: "Leipzig",   einheiten: ["201-B1-1", "201-B1-2", "202-C3-4"] },
+  { name: "Dresden",   einheiten: ["305-A1-2", "305-A2-3"] },
+  { name: "Chemnitz",  einheiten: ["410-D1-1", "410-D1-2"] }
+];
+
+(function(){
+  var selP = document.getElementById('ib-projekt');
+  var selE = document.getElementById('ib-einheit');
+  if(!selP || !selE) return;
+
+  function fill(sel, werte){
+    sel.innerHTML = '';
+    werte.forEach(function(w){
+      var o = document.createElement('option');
+      o.value = w; o.textContent = w;
+      sel.appendChild(o);
+    });
+  }
+
+  function einheitenLaden(index){
+    var p = IB_PROJEKTE[index];
+    if(!p) return;
+    fill(selE, p.einheiten);
+    selE.selectedIndex = 0;                 /* erste Wohnung des Projekts */
+    /* Hier spaeter die uebrigen Felder nachziehen, z. B.:
+       document.getElementById('ib-gesamtflaeche').textContent = ... ;      */
+    selE.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  fill(selP, IB_PROJEKTE.map(function(p){ return p.name; }));
+  selP.selectedIndex = 0;
+  einheitenLaden(0);
+
+  selP.addEventListener('change', function(){ einheitenLaden(selP.selectedIndex); });
+})();
+
+
+/* =========================================================================
+   A4-BLAETTER auf die verfuegbare Breite einpassen
+   Jedes Blatt wird so weit verkleinert, dass es in den Container passt –
+   nie vergroessert. Unterhalb von 820 px greift die Mobilansicht, dann
+   wird nicht gezoomt.
+   ========================================================================= */
+(function(){
+  var buehne = document.querySelector('.ib-sheets');
+  if(!buehne) return;
+  var blaetter = Array.prototype.slice.call(buehne.querySelectorAll('.ib-sheet'));
+
+  function einpassen(){
+    var platz = buehne.clientWidth - 28;              /* seitliches Padding */
+    var mobil = buehne.clientWidth <= 820;
+    blaetter.forEach(function(bl){
+      if(mobil){ bl.style.zoom = ''; return; }
+      var breite = bl.classList.contains('ib-sheet--quer') ? 1122.56 : 793.76;
+      bl.style.zoom = Math.min(1, platz / breite);
+    });
+  }
+
+  einpassen();
+  if(window.ResizeObserver) new ResizeObserver(einpassen).observe(buehne);
+  else window.addEventListener('resize', einpassen);
+  window.addEventListener('load', einpassen);
+})();
+
+
+/* =========================================================================
+   FORMEL-POPUP an den ⓘ-Symbolen
+   Das Fenster liegt per position:fixed ausserhalb der Tabelle – so wird es
+   vom horizontalen Scrollbereich der 12-Jahres-Tabelle nicht abgeschnitten.
+   ========================================================================= */
+(function(){
+  var tip = document.getElementById('ib-tip');
+  if(!tip) return;
+  var elT = tip.querySelector('.ib-tip-t'),
+      elF = tip.querySelector('.ib-tip-f'),
+      elK = tip.querySelector('.ib-tip-k'),
+      pfeil = tip.querySelector('.ib-tip-pfeil'),
+      aktiv = null;
+
+  function zeigen(btn){
+    if(aktiv && aktiv !== btn) aktiv.setAttribute('aria-expanded','false');
+    aktiv = btn;
+    btn.setAttribute('aria-expanded','true');
+    elT.textContent = btn.dataset.t || '';
+    elF.textContent = btn.dataset.f || '';
+    elK.textContent = btn.dataset.k || '';
+    tip.setAttribute('aria-hidden','false');
+    tip.classList.add('ib-tip--an');
+    tip.classList.remove('ib-tip--unten');
+
+    var b = btn.getBoundingClientRect(),
+        t = tip.getBoundingClientRect(),
+        rand = 10,
+        links = b.left + b.width/2 - t.width/2,
+        oben  = b.top - t.height - 9;
+
+    if(oben < rand){                       /* kein Platz oben -> darunter */
+      oben = b.bottom + 9;
+      tip.classList.add('ib-tip--unten');
+    }
+    links = Math.max(rand, Math.min(links, window.innerWidth - t.width - rand));
+    tip.style.left = links + 'px';
+    tip.style.top  = oben + 'px';
+    pfeil.style.left = (b.left + b.width/2 - links) + 'px';
+  }
+
+  function verbergen(){
+    tip.classList.remove('ib-tip--an');
+    tip.setAttribute('aria-hidden','true');
+    if(aktiv){
+      aktiv.setAttribute('aria-expanded','false');
+      /* Auf Touchgeraeten behaelt der Knopf sonst den Fokus- bzw.
+         Hover-Zustand und bleibt dunkel eingefaerbt. */
+      if(aktiv.blur) aktiv.blur();
+      aktiv = null;
+    }
+  }
+
+  document.querySelectorAll('.ib-info').forEach(function(btn){
+    btn.setAttribute('aria-expanded','false');
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      if(aktiv === btn) verbergen(); else zeigen(btn);
+    });
+    /* Nur auf Geraeten mit echtem Mauszeiger zusaetzlich beim Ueberfahren */
+    if(window.matchMedia('(hover: hover)').matches){
+      btn.addEventListener('mouseenter', function(){ zeigen(btn); });
+      btn.addEventListener('mouseleave', verbergen);
+      btn.addEventListener('focus', function(){ zeigen(btn); });
+      btn.addEventListener('blur', verbergen);
+    }
+  });
+
+  document.addEventListener('click', verbergen);
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') verbergen(); });
+  window.addEventListener('scroll', verbergen, true);
+  window.addEventListener('resize', verbergen);
+})();
+
+
+/* =========================================================================
+   UMSCHALTER: Ueberschuesse in die Sondertilgung ODER in ein
+   Tilgungsersatzinstrument. Genau eine Moeglichkeit ist aktiv; die Wahl
+   steuert zugleich die Beschriftung von Zeile 18 in Abschnitt 2.
+   ========================================================================= */
+(function(){
+  var boxen = [
+    { el: document.getElementById('ib-wahl-sondertilgung'),
+      zeile18: 'Sondertilgung',            kurz18: 'Sondertilgung' },
+    { el: document.getElementById('ib-wahl-ersatz'),
+      zeile18: 'Tilgungsersatzinstrument', kurz18: 'Tilg.-Ersatz' }
+  ].filter(function(b){ return b.el; });
+  var name = document.getElementById('ib-z18-name');
+  var nameKurz = document.getElementById('ib-z18-kurz');
+  if(boxen.length !== 2) return;
+
+  function waehlen(i){
+    boxen.forEach(function(b, k){
+      var an = k === i;
+      b.el.classList.toggle('ib-wahl-box--an', an);
+      b.el.setAttribute('aria-checked', an ? 'true' : 'false');
+      b.el.setAttribute('tabindex', an ? '0' : '-1');
+    });
+    if(name) name.textContent = boxen[i].zeile18;
+    if(nameKurz) nameKurz.textContent = boxen[i].kurz18;
+  }
+
+  boxen.forEach(function(b, i){
+    b.el.addEventListener('click', function(e){
+      waehlen(i);
+      /* Klick ins Renditefeld soll die Box zwar aktivieren, aber NICHT den
+         Fokus zurueck auf die Box ziehen - sonst kann man nicht tippen. */
+      var direktImFeld = e.target.closest && e.target.closest('[contenteditable="true"]');
+      if(!direktImFeld) b.el.focus();
+      window.ibBerechnen();
+    });
+    b.el.addEventListener('keydown', function(e){
+      var direktImFeld = e.target.closest && e.target.closest('[contenteditable="true"]');
+      if(direktImFeld) return; /* normales Editieren im Feld nicht durch Pfeiltasten-Navigation stoeren */
+      if(e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); waehlen(i); window.ibBerechnen(); }
+      if(e.key === 'ArrowDown' || e.key === 'ArrowRight'){ e.preventDefault(); waehlen(1); boxen[1].el.focus(); window.ibBerechnen(); }
+      if(e.key === 'ArrowUp'   || e.key === 'ArrowLeft'){  e.preventDefault(); waehlen(0); boxen[0].el.focus(); window.ibBerechnen(); }
+    });
+  });
+
+  waehlen(0);
+})();
+
+
+/* =========================================================================
+   ERGEBNIS NACH 12 JAHREN – Tortendiagramm und Legende
+   -------------------------------------------------------------------------
+   Eine Datenquelle fuer beides. Reihenfolge = Reihenfolge im Kreis
+   (im Uhrzeigersinn ab 12 Uhr). Negative Werte werden – wie in Excel –
+   mit ihrem Betrag gezeichnet, in der Legende aber mit Vorzeichen gezeigt.
+   ========================================================================= */
+/* Startbelegung, bis die erste echte Berechnung läuft (siehe ibBerechnen) */
+var IB_ERGEBNIS = [
+  /* Reihenfolge = Reihenfolge im Kreis (im Uhrzeigersinn ab 12 Uhr).
+     zeilen = Beschriftung |  seite = auf welcher Seite der Text steht
+     ly     = senkrechte Mitte des Textblocks (Einheiten der viewBox)      */
+  { wert:  44781, fill:"url(#ib-g-ek)",     seite:"rechts", ly:112,
+    zeilen:["44.781 €","Eigenkapital anf.","eingebracht","4%"] },
+
+  { wert: 554561, fill:"url(#ib-g-rest)",   seite:"rechts", ly:186,
+    zeilen:["554.561 €","Restschuld","53%"] },
+
+  { wert: -49567, fill:"url(#ib-g-miet)",   seite:"links",  ly:195,
+    zeilen:["-49.567 €","Mietüberhang","-5%"] },
+
+  { wert: 325691, fill:"url(#ib-g-steuer)", seite:"links",  ly:140,
+    zeilen:["325.691 €","Steuerersparnis","31%"] },
+
+  { wert:   7500, fill:"url(#ib-g-kfw)",    seite:"links",  ly:85,
+    zeilen:["7.500 €","KFW-Zuschuss","1%"] },
+
+  { wert: 159271, fill:"url(#ib-g-wert)",   seite:"links",  ly:30,
+    zeilen:["159.271 €","Wertsteigerung","15%"] },
+
+  { wert:     14, fill:"url(#ib-g-ek)",     seite:"rechts", ly:32,
+    zeilen:["14 €","Eigenkapital mon.","eingebracht","0%"] }
+];
+
+/* Als Funktion, damit ibBerechnen() nach jeder Eingabe neu zeichnen kann. */
+window.ibRenderPie = function(IB_ERGEBNIS){
+  /* Kreis */
+  var CX = 142, CY = 106, R = 48, RB = 56, ZEILE = 13, NS = 'http://www.w3.org/2000/svg';
+  /* Fuehrungslinie: kurzes radiales Stueck, dann EIN gerader Zug zum Text.
+     Bewusst nur ein Knick – mehrere Knicke wirken unruhig.               */
+  var TEXT_X = { links:  84, rechts: 200 };
+  var ANKER  = { links: 'end', rechts: 'start' };
+
+  var gTeile  = document.getElementById('ib-pie-slices'),
+      gTexte  = document.getElementById('ib-pie-texte'),
+      gLinien = document.getElementById('ib-pie-linien');
+  if(!gTeile) return;
+
+  gTeile.innerHTML = ''; gTexte.innerHTML = ''; if(gLinien) gLinien.innerHTML = '';
+
+  var summe = IB_ERGEBNIS.reduce(function(s,d){ return s + Math.abs(d.wert); }, 0);
+  if(summe <= 0) return;
+
+  function punkt(grad, r){
+    var b = (grad - 90) * Math.PI / 180;
+    return [CX + r * Math.cos(b), CY + r * Math.sin(b)];
+  }
+  function bogen(a, b){
+    var s = punkt(a, R), e = punkt(b, R), gross = (b - a) > 180 ? 1 : 0;
+    return 'M' + CX + ',' + CY + ' L' + s[0].toFixed(2) + ',' + s[1].toFixed(2) +
+           ' A' + R + ',' + R + ' 0 ' + gross + ' 1 ' + e[0].toFixed(2) + ',' + e[1].toFixed(2) + ' Z';
+  }
+
+  var a0 = 0;
+  IB_ERGEBNIS.forEach(function(d){
+    var weite = Math.abs(d.wert) / summe * 360, a1 = a0 + weite, mitte = a0 + weite/2;
+
+    if(weite > 0.15){
+      var pfad = document.createElementNS(NS, 'path');
+      pfad.setAttribute('d', bogen(a0, a1));
+      pfad.setAttribute('fill', d.fill);
+      gTeile.appendChild(pfad);
+    }
+
+    /* Verbindungslinie: Kreisrand -> kurzes radiales Stueck -> Text.
+       Genau ein Knick, Ende 3 Einheiten vor der Schrift.                 */
+    if(gLinien){
+      var A = punkt(mitte, R), B = punkt(mitte, RB),
+          tx = TEXT_X[d.seite] + (d.seite === 'links' ? -3 : 3);
+      var pl = document.createElementNS(NS, 'polyline');
+      pl.setAttribute('points',
+        A[0].toFixed(2) + ',' + A[1].toFixed(2) + ' ' +
+        B[0].toFixed(2) + ',' + B[1].toFixed(2) + ' ' +
+        tx + ',' + d.ly);
+      gLinien.appendChild(pl);
+    }
+
+    /* Beschriftung, senkrecht auf ly zentriert */
+    if(gTexte){
+      var n = d.zeilen.length, start = d.ly - (n - 1) * ZEILE / 2 + 3.9;
+      d.zeilen.forEach(function(zeile, k){
+        var t = document.createElementNS(NS, 'text');
+        t.setAttribute('x', TEXT_X[d.seite] + (d.seite === 'links' ? -4 : 4));
+        t.setAttribute('y', (start + k * ZEILE).toFixed(1));
+        t.setAttribute('text-anchor', ANKER[d.seite]);
+        /* Zahlenzeilen in der Zahlenschrift, Bezeichnungen fett. */
+        if(/^[-+−–]?[0-9]/.test(zeile)) t.setAttribute('class', 'ib-num');
+        t.setAttribute('font-weight', '700');
+        t.textContent = zeile;
+        gTexte.appendChild(t);
+      });
+    }
+    a0 = a1;
+  });
+};
+
+window.ibRenderPie(IB_ERGEBNIS);
+
+
+/* =========================================================================
+   WERKZEUGE: Drucken, Zuruecksetzen, Hinweise
+   ========================================================================= */
+(function(){
+  var status = document.getElementById('ib-status');
+  var meldeZeit;
+
+  function melden(text){
+    if(!status) return;
+    status.textContent = text;
+    status.classList.add('ib-status--an');
+    clearTimeout(meldeZeit);
+    meldeZeit = setTimeout(function(){ status.classList.remove('ib-status--an'); }, 2200);
+  }
+
+  /* ---------------------------------------------------------------------
+     NEUBERECHNUNG
+     Wird ausgeloest, sobald ein Eingabefeld verlassen oder geaendert wird.
+     >>> Hier die Rechenlogik einhaengen. <<<
+     Die Anzeigefelder haben eigene IDs (z. B. #ib-kaufpreis-inkl-nk,
+     #ib-z6, #ib-kpi-ekr), Tabellenwerte liegen in #ib-z1 … #ib-z19.
+     --------------------------------------------------------------------- */
+  /* Die tatsaechliche Rechenlogik (window.ibBerechnen) wird weiter unten
+     im Abschnitt "RECHENMOTOR" / "NEUBERECHNUNG" definiert. */
+
+  /* Hilfsfunktionen: deutsches Zahlenformat lesen und schreiben */
+  window.ibZahl = function(el){
+    if(!el) return 0;
+    var t = (el.value !== undefined ? el.value : el.textContent) || '';
+    t = t.replace(/[^0-9,\-]/g, '').replace(/\./g, '').replace(',', '.');
+    var z = parseFloat(t);
+    return isNaN(z) ? 0 : z;
+  };
+  window.ibEuro = function(z){
+    return z.toLocaleString('de-DE', { maximumFractionDigits: 0 }) + ' €';
+  };
+
+  /* Berechnung beim Verlassen des Feldes */
+  var doc = document.querySelector('.ib-doc');
+  if(doc){
+    doc.addEventListener('change', function(e){
+      if(e.target.matches('input, select, textarea')) window.ibBerechnen();
+    });
+    doc.addEventListener('focusout', function(e){
+      if(e.target.matches('input[type="text"], input[type="number"], [contenteditable="true"]')) window.ibBerechnen();
+    });
+  }
+
+  /* ---- Drucken ---- */
+  var btnDruck = document.getElementById('ib-btn-drucken');
+  if(btnDruck) btnDruck.addEventListener('click', function(){ window.print(); });
+
+  /* ---- Zuruecksetzen ---- */
+  var btnReset = document.getElementById('ib-btn-reset');
+  if(btnReset) btnReset.addEventListener('click', function(){
+    var p = document.getElementById('ib-projekt');
+    if(p){ p.selectedIndex = 0; p.dispatchEvent(new Event('change', { bubbles: true })); }
+    var ersteWahl = document.getElementById('ib-wahl-sondertilgung');
+    if(ersteWahl) ersteWahl.click();
+    doc.querySelectorAll('input, textarea').forEach(function(f){
+      if(f.dataset.start !== undefined) f.value = f.dataset.start;
+    });
+    if(window.IB_STARTWERTE){
+      Object.keys(window.IB_STARTWERTE).forEach(function(id){
+        if(id === 'ib-grest-label' || id === 'ib-kirchensteuer-label') return;
+        var el = document.getElementById(id);
+        if(!el) return;
+        var start = window.IB_STARTWERTE[id];
+        if(id === 'ib-baujahr-vor1925') el.classList.toggle('ib-cb--on', !!start);
+        else el.textContent = start;
+      });
+      var selBlR = document.getElementById('ib-grest-label');
+      if(selBlR && window.IB_STARTWERTE['ib-grest-label'] != null) selBlR.selectedIndex = window.IB_STARTWERTE['ib-grest-label'];
+      if(selBlR) selBlR.dispatchEvent(new Event('change', { bubbles: true }));
+      var selKircheR = document.getElementById('ib-kirchensteuer-label');
+      if(selKircheR && window.IB_STARTWERTE['ib-kirchensteuer-label'] != null) selKircheR.selectedIndex = window.IB_STARTWERTE['ib-kirchensteuer-label'];
+      if(selKircheR) selKircheR.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    window.ibBerechnen();
+    melden('Auf Ausgangswerte zurückgesetzt');
+  });
+})();
+
+
+/* =========================================================================
+   EINGABEFELDER AKTIVIEREN
+   -------------------------------------------------------------------------
+   Alle Felder mit der Klasse "ib-in" (ausser den Auswahllisten Projekt/
+   Einheit) werden hier per JS editierbar gemacht (contenteditable). Am
+   Markup und am CSS aendert sich dadurch nichts – nur das Verhalten im
+   Browser kommt hinzu. Zusaetzlich: Klick-Umschalter fuer "vor 1925" und
+   "Splitting (Ja/Nein)", da das reine Textfelder bzw. eine Checkbox-Raute
+   ohne <input> sind.
+   ========================================================================= */
+(function(){
+  var doc = document.querySelector('.ib-doc');
+  if(!doc) return;
+
+  /* Art jedes Eingabefelds: bestimmt Parsen/Formatieren beim Verlassen.
+     eur0 = Euro ohne Nachkommastellen, eur2 = Euro mit 2 Nachkommastellen,
+     pct1 = Prozent mit 1 Nachkommastelle, pct2 = Prozent mit 2 Nachkommastellen,
+     m2   = Flaeche mit 1 Nachkommastelle.                                   */
+  window.IB_FELDART = {
+    'ib-gesamtflaeche':        'm2',
+    'ib-wertsteigerung':       'pct1',
+    'ib-kaufpreis-einheit':    'eur0',
+    'ib-kaufpreis-stellplatz': 'eur0',
+    'ib-notarkosten-satz':     'pct1',
+    'ib-beratungshonorar-satz':'pct1',
+    'ib-bauzeitzinsen-satz':   'pct1',
+    'ib-kaltmiete-qm':         'eur2',
+    'ib-miete-stellplatz':     'eur0',
+    'ib-hausverwaltung':       'eur2',
+    'ib-mietsteigerung':       'pct1',
+    'ib-ruecklage':            'eur2',
+    'ib-bodenanteil-satz':     'pct1',
+    'ib-altsubstanz-satz':     'pct1',
+    'ib-zve-1-4':              'eur0',
+    'ib-eigenkapital':         'eur0',
+    'ib-hd-nominalzins':       'pct2',
+    'ib-hd-tilgung':           'pct1',
+    'ib-kapitalmarktrendite':  'pct2',
+    'ib-kfw-kapitalbedarf':    'eur0',
+    'ib-kfw-nominalzins':      'pct2',
+    'ib-kfw-tilgung':          'pct1',
+    'ib-kfw-tilgungszuschuss': 'eur0',
+    'ib-kfw-zuschuss-flex':    'eur0'
+  };
+  /* Freitextfelder: editierbar, aber ohne Zahlenformatierung */
+  var FREITEXT = ['ib-name', 'ib-monat-jahr', 'ib-monat-monat'];
+
+  function formatByArt(n, art){
+    if(n == null || isNaN(n)) n = 0;
+    if(art === 'eur0') return Math.round(n).toLocaleString('de-DE') + ' €';
+    if(art === 'eur2') return n.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
+    if(art === 'pct1') return n.toLocaleString('de-DE', {minimumFractionDigits:1, maximumFractionDigits:1}) + ' %';
+    if(art === 'pct2') return n.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' %';
+    if(art === 'm2')   return n.toLocaleString('de-DE', {minimumFractionDigits:1, maximumFractionDigits:1}) + ' m²';
+    return String(n);
+  }
+
+  /* Ausgangswerte merken (fuer "Zuruecksetzen") */
+  window.IB_STARTWERTE = {};
+
+  function machEditierbar(id, art){
+    var el = document.getElementById(id);
+    if(!el) return;
+    window.IB_STARTWERTE[id] = el.textContent;
+    el.setAttribute('contenteditable', 'true');
+    el.setAttribute('inputmode', art ? 'decimal' : 'text');
+    el.classList.add('ib-editierbar');
+    el.addEventListener('focus', function(){
+      /* beim Reinklicken: bei Zahlenfeldern Rohwert ohne Einheit anzeigen,
+         leichter zu tippen. Freitextfelder (Name, Monat) bleiben unveraendert. */
+      if(art){
+        var z = window.ibZahl(el);
+        el.textContent = (z === 0 && el.textContent.replace(/[^\d]/g,'') === '') ? '' : String(z).replace('.', ',');
+      }
+      var range = document.createRange();
+      range.selectNodeContents(el);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    });
+    el.addEventListener('blur', function(){
+      if(art){
+        var z = window.ibZahl(el);
+        el.textContent = formatByArt(z, art);
+      }
+      window.ibBerechnen();
+    });
+    el.addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){ e.preventDefault(); el.blur(); }
+    });
+  }
+
+  Object.keys(window.IB_FELDART).forEach(function(id){ machEditierbar(id, window.IB_FELDART[id]); });
+  FREITEXT.forEach(function(id){ machEditierbar(id, null); });
+
+  /* ---- Checkbox "vor 1925" ---- */
+  var cbBaujahr = document.getElementById('ib-baujahr-vor1925');
+  if(cbBaujahr){
+    window.IB_STARTWERTE['ib-baujahr-vor1925'] = cbBaujahr.classList.contains('ib-cb--on');
+    cbBaujahr.addEventListener('click', function(){
+      cbBaujahr.classList.toggle('ib-cb--on');
+      var afaFeld = document.getElementById('ib-afa-altsubstanz');
+      if(afaFeld) afaFeld.textContent = formatByArt(cbBaujahr.classList.contains('ib-cb--on') ? 2.5 : 2.0, 'pct1');
+      window.ibBerechnen();
+    });
+  }
+
+  /* ---- "Splitting": Klick schaltet zwischen Ja / Nein um ---- */
+  var elSplitting = document.getElementById('ib-splitting');
+  if(elSplitting){
+    window.IB_STARTWERTE['ib-splitting'] = elSplitting.textContent;
+    elSplitting.removeAttribute('contenteditable');
+    elSplitting.style.cursor = 'pointer';
+    elSplitting.addEventListener('click', function(){
+      var istJa = /ja/i.test(elSplitting.textContent);
+      elSplitting.textContent = istJa ? 'Nein' : 'Ja';
+      window.ibBerechnen();
+    });
+  }
+})();
+
+
+/* =========================================================================
+   BUNDESLAND -> GRUNDERWERBSTEUER + KIRCHENSTEUER
+   -------------------------------------------------------------------------
+   Werte urspruenglich aus dem Admin-Blatt der Excel-Vorlage uebernommen.
+   Vier GrESt-Saetze dort waren nicht mehr aktuell (Reform seit Admin-Stand):
+   Bremen (5,0 -> 5,5 % seit 1.7.2025), Hamburg (4,5 -> 5,5 % seit 1.1.2023),
+   Sachsen (3,5 -> 5,5 % seit 1.1.2023), Thueringen (6,5 -> 5,0 % seit 1.1.2024).
+   Hier sind die aktuell geltenden Saetze hinterlegt (Stand siehe Chat) –
+   bei Bedarf in IB_BUNDESLAENDER leicht anzupassen.
+   Kirchensteuer: 8 % in Bayern/Baden-Wuerttemberg, sonst 9 % (unveraendert
+   gegenueber der Vorlage).
+   ========================================================================= */
+var IB_BUNDESLAENDER = [
+  { name: 'Baden-Württemberg', grest: 5.0, kst: 8 },
+  { name: 'Bayern',            grest: 3.5, kst: 8 },
+  { name: 'Berlin',            grest: 6.0, kst: 9 },
+  { name: 'Brandenburg',       grest: 6.5, kst: 9 },
+  { name: 'Bremen',            grest: 5.5, kst: 9 },
+  { name: 'Hamburg',           grest: 5.5, kst: 9 },
+  { name: 'Hessen',            grest: 6.0, kst: 9 },
+  { name: 'Mecklenburg-Vorp.', grest: 6.0, kst: 9 },
+  { name: 'Niedersachsen',     grest: 5.0, kst: 9 },
+  { name: 'Nordrhein-Westfalen', grest: 6.5, kst: 9 },
+  { name: 'Rheinland-Pfalz',   grest: 5.0, kst: 9 },
+  { name: 'Saarland',          grest: 6.5, kst: 9 },
+  { name: 'Sachsen',           grest: 5.5, kst: 9 },
+  { name: 'Sachsen-Anhalt',    grest: 5.0, kst: 9 },
+  { name: 'Schleswig-Holstein',grest: 6.5, kst: 9 },
+  { name: 'Thüringen',         grest: 5.0, kst: 9 }
+];
+
+(function(){
+  var grestLabel = document.getElementById('ib-grest-label');
+  var grestSatz = document.getElementById('ib-grest-satz');
+  var selKirche = document.getElementById('ib-kirchensteuer-label');
+  var kircheSatz = document.getElementById('ib-kirchensteuer-satz');
+  if(!grestLabel) return;
+
+  function pct1(n){ return n.toLocaleString('de-DE', {minimumFractionDigits:1, maximumFractionDigits:1}) + ' %'; }
+
+  /* ---- GrESt-Feld IST die Bundesland-Auswahl (kein separates Feld mehr) ---- */
+  var grestOptionen = IB_BUNDESLAENDER.map(function(land){ return { name: 'GrESt ' + land.name, grest: land.grest }; });
+  grestLabel.innerHTML = '';
+  grestOptionen.forEach(function(opt){
+    var o = document.createElement('option');
+    o.value = opt.name; o.textContent = opt.name;
+    grestLabel.appendChild(o);
+  });
+  function aktualisiereGrest(){
+    var opt = grestOptionen[grestLabel.selectedIndex] || grestOptionen[0];
+    if(grestSatz) grestSatz.textContent = pct1(opt.grest);
+  }
+  var startIdxBl = IB_BUNDESLAENDER.findIndex(function(l){ return l.name === 'Bayern'; });
+  grestLabel.selectedIndex = startIdxBl >= 0 ? startIdxBl : 0;
+  grestLabel.addEventListener('change', function(){ aktualisiereGrest(); window.ibBerechnen(); });
+
+  /* ---- Kirchensteuer: eigenes, unabhaengiges Auswahlfeld
+     ("keine KirchenSt." + "KSt <Bundesland>" je Land) – genau wie im
+     Original-Excel (Admin!J12:L28), unabhaengig von der GrESt-Auswahl,
+     da Wohnsitz (Kirchensteuer) und Lage der Immobilie (GrESt) nicht
+     zwangslaeufig dasselbe Bundesland sind. ---- */
+  if(selKirche){
+    var kirchenOptionen = [{ name: 'keine KirchenSt.', kst: 0 }].concat(
+      IB_BUNDESLAENDER.map(function(land){ return { name: 'KSt ' + land.name, kst: land.kst }; })
+    );
+    selKirche.innerHTML = '';
+    kirchenOptionen.forEach(function(opt){
+      var o = document.createElement('option');
+      o.value = opt.name; o.textContent = opt.name;
+      selKirche.appendChild(o);
+    });
+    function aktualisiereKirche(){
+      var opt = kirchenOptionen[selKirche.selectedIndex] || kirchenOptionen[0];
+      if(kircheSatz) kircheSatz.textContent = pct1(opt.kst);
+    }
+    selKirche.selectedIndex = 0; /* Ausgangszustand: keine KirchenSt., wie Vorlage */
+    selKirche.addEventListener('change', function(){ aktualisiereKirche(); window.ibBerechnen(); });
+    aktualisiereKirche();
+
+    window.IB_STARTWERTE = window.IB_STARTWERTE || {};
+    window.IB_STARTWERTE['ib-kirchensteuer-label'] = selKirche.selectedIndex;
+  }
+
+  window.IB_STARTWERTE = window.IB_STARTWERTE || {};
+  window.IB_STARTWERTE['ib-grest-label'] = grestLabel.selectedIndex;
+
+  aktualisiereGrest();
+})();
+
+
+/* =========================================================================
+   RECHENMOTOR
+   -------------------------------------------------------------------------
+   Eingebettete Fassung von math-logic.js (§32a EStG, monatsgenaue
+   Annuitaet, Simulation ueber mehrere Jahre), leicht angepasst:
+   - AfA-Satz Altsubstanz kommt direkt aus dem Eingabefeld
+     "Abschreibung Altsubstanz" (statt starr aus dem Baujahr-Haekchen).
+   - Liquiditaetsueberschuss (Zeile 15) beruecksichtigt zusaetzlich die
+     Instandhaltungsruecklage (Zeile 14), wie im ⓘ-Hinweis der Tabelle
+     dokumentiert: Zeile 15 = Zeile 2 + Zeile 3 + Zeile 13 + Zeile 14.
+   ========================================================================= */
+(function(){
+
+  function berechneESt(zve, isSplitting){
+    if(zve <= 0) return 0;
+    var a = isSplitting ? zve / 2 : zve;
+    var est = 0;
+    if(a <= 12348) est = 0;
+    else if(a <= 17799){ var y = (a - 12348) / 10000; est = (914.51 * y + 1400) * y; }
+    else if(a <= 69878){ var z = (a - 17799) / 10000; est = (173.1 * z + 2397) * z + 1034.87; }
+    else if(a <= 277825) est = 0.42 * a - 11135.63;
+    else est = 0.45 * a - 19470.38;
+    return isSplitting ? est * 2 : est;
+  }
+
+  function berechneSoli(est, isSplitting){
+    if(est <= 0) return 0;
+    var freigrenze = isSplitting ? 40700 : 20350; /* aktuelle Freigrenze seit 2024, Admin!O27/P27 */
+    if(est <= freigrenze) return 0;
+    return Math.min((est - freigrenze) * 0.119, est * 0.055);
+  }
+
+  function resolveStellplatzMoebel(inputs){
+    var stellplatz = inputs.stellplatz || 0;
+    var moebel = inputs.moebel || 0;
+    return { stellplatz: stellplatz, moebel: moebel };
+  }
+
+  function resolveMiete(inputs){
+    var flaeche = inputs.flaeche || 0;
+    var bruttoPA = flaeche * (inputs.mieteQm || 0) * 12 + (inputs.stellplatzMietePm || 0) * 12;
+    var hausverwaltungPA = (inputs.hausverwaltungPm || 0) * 12;
+    var ruecklagePA = inputs.ruecklagePa || 0;
+    /* Nur die Hausverwaltung mindert die (steuerlich relevante) Nettokaltmiete –
+       die Instandhaltungsruecklage ist eine Rueckstellung, kein Werbungskostenabzug,
+       und wirkt sich nur auf die Liquiditaet aus (siehe berechneImmobilie). */
+    var nettoPA = bruttoPA - hausverwaltungPA;
+    return { bruttoPA: bruttoPA, nettoPA: nettoPA, hausverwaltungPA: hausverwaltungPA, ruecklagePA: ruecklagePA };
+  }
+
+  function resolveAfaBasen(kaufpreis, stellplatz, moebel, anteilSan, anteilAlt, notarPz, grestPz, stellplatzSanierungsanteil){
+    /* 1:1 nach Eingaben!F15/F17/F19: Notarkosten+GrESt werden anteilig auf
+       Boden/Altsubstanz/Sanierung verteilt (nicht als eigene Position),
+       der Stellplatz-Wert (ebenso um Notar/GrESt hochgerechnet) geht
+       komplett in eine der beiden Positionen, nicht anteilig. */
+    var sanPz = anteilSan || 0, altPz = anteilAlt || 0;
+    var nkFaktor = 1 + ((notarPz || 0) + (grestPz || 0)) / 100;
+    var grundlage = kaufpreis * nkFaktor;
+    var stellplatzHoch = stellplatz * nkFaktor;
+    var spInSan = stellplatzSanierungsanteil !== false;
+    var basisBoden = grundlage * ((100 - sanPz - altPz) >= 0 ? (100 - sanPz - altPz) / 100 : 0);
+    var basisSanierung = grundlage * (sanPz / 100) + (spInSan ? stellplatzHoch : 0);
+    var basisAltsubstanz = grundlage * (altPz / 100) + (!spInSan ? stellplatzHoch : 0);
+    return { basisBoden: basisBoden, basisSanierung: basisSanierung, basisAltsubstanz: basisAltsubstanz, basisMoebel: moebel };
+  }
+
+  function berechneInvestition(inputs, eigenkapital){
+    var kaufpreis = inputs.kaufpreis || 0;
+    var sm = resolveStellplatzMoebel(inputs), stellplatz = sm.stellplatz, moebel = sm.moebel;
+    var kaufpreisGesamt = kaufpreis + stellplatz + moebel;
+
+    var notarPz = inputs.notarPz || 0, grestPz = inputs.grestPz || 0;
+    var beratungPz = inputs.beratungshonorarPz || 0, bauzeitPz = inputs.bauzeitzinsenPz || 0;
+
+    var nkBasis = kaufpreis + stellplatz;
+    var notarBetrag = nkBasis * (notarPz / 100);
+    var grestBetrag = nkBasis * (grestPz / 100);
+    /* Beratungshonorar-Basis wie Eingaben!B27: nur Kaufpreis+Stellplatz, ohne Moebel */
+    var beratungBetrag = nkBasis * (beratungPz / 100);
+    var investOhneBauzeit = kaufpreisGesamt + notarBetrag + grestBetrag + beratungBetrag;
+
+    /* Bauzeitzinsen wie Eingaben!B29: auf der VOLLEN Investitionssumme (nicht
+       um Eigenkapital gekuerzt), mal Zinssatz, mal (1 - 42%) als pauschaler
+       Steuervorteil ("nach Steuern"; 42% = Spitzensteuersatz, nicht personalisiert). */
+    var bauzeitzinsenBetrag = investOhneBauzeit * (bauzeitPz / 100) * (1 - 0.42);
+    var kaufpreisInklNk = investOhneBauzeit + bauzeitzinsenBetrag;
+
+    return {
+      kaufpreis: kaufpreis, stellplatz: stellplatz, moebel: moebel, kaufpreisGesamt: kaufpreisGesamt,
+      notarBetrag: notarBetrag, grestBetrag: grestBetrag, beratungBetrag: beratungBetrag,
+      bauzeitzinsenBetrag: bauzeitzinsenBetrag, kaufpreisInklNk: kaufpreisInklNk
+    };
+  }
+
+  function initDarlehen(inputs){
+    var darlehen = inputs.darlehen || [];
+    var sim = [];
+    darlehen.forEach(function(cfg){
+      var betrag = Math.max(0, cfg.amount || 0);
+      if(betrag <= 0) return;
+      if(cfg.isKfw){
+        var zuschuss = Math.max(0, cfg.zuschuss || 0);
+        var zins = (cfg.zins || 0) / 100, tilg = (cfg.tilg || 0) / 100;
+        var netto = Math.max(0, betrag - zuschuss);
+        sim.push({
+          name: cfg.name || 'KfW', typ: 'kfw', restschuld: netto,
+          zinsNominalJ1: betrag, tilgungszuschuss: zuschuss,
+          zinsAktuell: zins, tilgSatz: tilg,
+          anschlussZins: ((cfg.anschluss != null ? cfg.anschluss : cfg.zins) || 0) / 100,
+          bindung: cfg.bindung || 10, annuitaet: betrag * (zins + tilg)
+        });
+        return;
+      }
+      var zins2 = (cfg.zins || 0) / 100, tilg2 = (cfg.tilg || 0) / 100;
+      sim.push({
+        name: cfg.name || 'Darlehen', typ: 'bank', restschuld: betrag,
+        zinsAktuell: zins2, tilgSatz: tilg2,
+        anschlussZins: ((cfg.anschluss != null ? cfg.anschluss : cfg.zins) || 0) / 100,
+        bindung: cfg.bindung || 10, annuitaet: betrag * (zins2 + tilg2)
+      });
+    });
+    return sim;
+  }
+
+  function monatlicheAnnuitaet(darlehen, jahr, monat, monatsVerlaufJ1, perLoanAcc){
+    var zinsSumme = 0, tilgungSumme = 0;
+    darlehen.forEach(function(d){
+      if(d.restschuld <= 0) return;
+      var zinsSatz = jahr > d.bindung ? d.anschlussZins : d.zinsAktuell;
+      var monatsRate = d.annuitaet / 12;
+      var zinsBasis = (jahr === 1 && d.zinsNominalJ1) ? d.zinsNominalJ1 : d.restschuld;
+      var zins = zinsBasis * (zinsSatz / 12);
+      var tilgung = monatsRate - zins;
+      if(tilgung > d.restschuld) tilgung = d.restschuld;
+      d.restschuld -= tilgung;
+      if(jahr > 1) d.zinsNominalJ1 = null;
+      zinsSumme += zins; tilgungSumme += tilgung;
+      if(perLoanAcc){
+        var acc = perLoanAcc.filter(function(a){ return a.name === d.name; })[0];
+        if(acc){ acc.zins += zins; acc.tilgungPflicht += tilgung; }
+      }
+      if(jahr === 1 && monatsVerlaufJ1) monatsVerlaufJ1.push({ monat: monat, darlehen: d.name, zins: zins, tilgung: tilgung, restschuld: d.restschuld, rate: monatsRate });
+    });
+    return { zinsSumme: zinsSumme, tilgungSumme: tilgungSumme };
+  }
+
+  function berechneAfa(jahr, basisSanierung, basisAltsubstanz, basisMoebel, afaSatzAlt, maxJahreAlt){
+    var afaSan = 0;
+    if(jahr <= 8) afaSan = basisSanierung * 0.09;
+    else if(jahr <= 12) afaSan = basisSanierung * 0.07;
+    var afaAlt = jahr <= maxJahreAlt ? basisAltsubstanz * afaSatzAlt : 0;
+    var afaMoebel = jahr <= 5 && basisMoebel > 0 ? basisMoebel / 5 : 0;
+    return { afaSan: afaSan, afaAlt: afaAlt, afaMoebel: afaMoebel, afaGesamt: afaSan + afaAlt + afaMoebel };
+  }
+
+  function sondertilgungAnwenden(darlehen, betrag){
+    var verbleibend = betrag, gesamt = 0, byLoan = {};
+    var prioritaet = darlehen.slice().sort(function(a, b){
+      if(a.typ === b.typ) return 0;
+      return a.typ === 'bank' ? -1 : 1;
+    });
+    prioritaet.forEach(function(d){
+      if(verbleibend <= 0 || d.restschuld <= 0) return;
+      var extra = Math.min(verbleibend, d.restschuld);
+      d.restschuld -= extra; gesamt += extra;
+      byLoan[d.name] = (byLoan[d.name] || 0) + extra;
+      verbleibend -= extra;
+    });
+    return { gesamt: gesamt, byLoan: byLoan };
+  }
+
+  function berechneImmobilie(inputs){
+    var eigenkapital = inputs.eigenkapital || 0;
+    var invest = berechneInvestition(inputs, eigenkapital);
+    var kaufpreis = invest.kaufpreis, stellplatz = invest.stellplatz, moebel = invest.moebel,
+        kaufpreisGesamt = invest.kaufpreisGesamt, kaufpreisInklNk = invest.kaufpreisInklNk;
+
+    var afaBasen = resolveAfaBasen(kaufpreis, stellplatz, moebel, inputs.anteilSanierung || 0, inputs.anteilAltsubstanz || 0, inputs.notarPz || 0, inputs.grestPz || 0, inputs.stellplatzSanierungsanteil);
+    var basisSanierung = afaBasen.basisSanierung, basisAltsubstanz = afaBasen.basisAltsubstanz, basisMoebel = afaBasen.basisMoebel;
+    var afaSatzAlt = (inputs.afaSatzAlt != null ? inputs.afaSatzAlt : 0.02);
+    var maxJahreAlt = Math.ceil(1 / afaSatzAlt);
+
+    var mieteStart = resolveMiete(inputs);
+    var kiStSatz = (inputs.kirchensteuer || 0) / 100;
+    var wertsteigerung = (inputs.wertsteigerung || 0) / 100;
+    var mietsteigerung = (inputs.mietsteigerung || 0) / 100;
+    var isSplitting = !!inputs.isSplitting;
+
+    var darlehen = initDarlehen(inputs);
+    var jahresVerlauf = [];
+    var monatsVerlaufJ1 = [];
+    var summeEkNachschuss = 0;
+    var tilgungsinstrumentBestand = 0;
+    var summeEingezahltInstrument = 0;
+    /* "Netto-Kapitalmarktrendite" wird bereits als Nettogroesse verstanden –
+       keine weitere Steuerkuerzung hier, das entscheidet die Eingabe selbst. */
+
+    for(var jahr = 1; jahr <= 75; jahr++){
+      var rsAnf = darlehen.reduce(function(s, d){ return s + Math.max(0, d.restschuld); }, 0);
+      if(rsAnf <= 0.01 && jahr > 1 && tilgungsinstrumentBestand <= 0.01) break;
+
+      var perLoanAcc = darlehen.map(function(d){ return { name: d.name, typ: d.typ, zins: 0, tilgungPflicht: 0 }; });
+
+      var mieteFaktor = Math.pow(1 + mietsteigerung, jahr - 1);
+      var mietePA = mieteStart.nettoPA * mieteFaktor;
+      var bruttoMietePA = mieteStart.bruttoPA * mieteFaktor;
+
+      var tilgungAnnuitaet = 0, zinsSumme = 0;
+      for(var monat = 1; monat <= 12; monat++){
+        var m = monatlicheAnnuitaet(darlehen, jahr, monat, jahr === 1 ? monatsVerlaufJ1 : null, perLoanAcc);
+        zinsSumme += m.zinsSumme; tilgungAnnuitaet += m.tilgungSumme;
+      }
+      var pflichtTilgung = tilgungAnnuitaet;
+
+      var afa = berechneAfa(jahr, basisSanierung, basisAltsubstanz, basisMoebel, afaSatzAlt, maxJahreAlt);
+      var steuerlicherVerlust = mietePA - zinsSumme - afa.afaGesamt;
+      var zveJahr = inputs.zve || 0;
+      var zveNach = zveJahr + steuerlicherVerlust;
+      var estVor = berechneESt(zveJahr, isSplitting), estNach = berechneESt(zveNach, isSplitting);
+      var soliVor = berechneSoli(estVor, isSplitting), soliNach = berechneSoli(estNach, isSplitting);
+      var kiStVor = estVor * kiStSatz, kiStNach = estNach * kiStSatz;
+      var ersparnisEst = estVor - estNach, ersparnisSoli = soliVor - soliNach, ersparnisKiSt = kiStVor - kiStNach;
+      var steuerersparnis = ersparnisEst + ersparnisSoli + ersparnisKiSt;
+      /* Zeile 15 = Zeile2 + Zeile3 + Zeile13 + Zeile14 (siehe ⓘ in Abschnitt 2) */
+      var liqUeberschuss = mietePA - zinsSumme + steuerersparnis - mieteStart.ruecklagePA;
+      var ueberschussInTilgung = inputs.ueberschussInTilgung !== false;
+
+      var sondertilgung = 0, sondertilgByLoan = {}, tilgungGesamt = pflichtTilgung;
+      if(ueberschussInTilgung && liqUeberschuss > pflichtTilgung){
+        var extraTilgung = liqUeberschuss - pflichtTilgung;
+        var st = sondertilgungAnwenden(darlehen, extraTilgung);
+        sondertilgung = st.gesamt; sondertilgByLoan = st.byLoan;
+        tilgungGesamt = pflichtTilgung + sondertilgung;
+      }
+
+      var cashflow = 0;
+      if(pflichtTilgung > liqUeberschuss){
+        cashflow = liqUeberschuss - pflichtTilgung;
+        if(cashflow < 0) summeEkNachschuss += Math.abs(cashflow);
+      } else if(!ueberschussInTilgung){
+        cashflow = liqUeberschuss - pflichtTilgung;
+      }
+
+      var beitragInstrument = 0;
+      if(!ueberschussInTilgung){
+        beitragInstrument = Math.max(0, cashflow);
+        /* Zinseszins: bestehender Bestand wird zuerst verzinst, dann kommt
+           die neue Jahreseinzahlung dazu (die selbst erst naechstes Jahr
+           mitverzinst wird). */
+        tilgungsinstrumentBestand = tilgungsinstrumentBestand * (1 + (inputs.kapitalmarktrendite || 0) / 100) + beitragInstrument;
+        summeEingezahltInstrument += beitragInstrument;
+      }
+
+      var restschuld = darlehen.reduce(function(s, d){ return s + Math.max(0, d.restschuld); }, 0);
+
+      jahresVerlauf.push({
+        jahr: jahr, miete: mietePA, bruttoMiete: bruttoMietePA, zinsen: zinsSumme,
+        tilgung: tilgungGesamt, pflichtTilgung: pflichtTilgung,
+        afaSan: afa.afaSan, afaAlt: afa.afaAlt, afaMoebel: afa.afaMoebel, afaAltMoebel: afa.afaAlt + afa.afaMoebel,
+        verlust: steuerlicherVerlust, zveVor: zveJahr, zveNach: zveNach,
+        estVor: estVor, estNach: estNach, ersparnisEst: ersparnisEst, ersparnisSoli: ersparnisSoli, ersparnisKiSt: ersparnisKiSt,
+        steuerersparnis: steuerersparnis, liqUeberschuss: liqUeberschuss,
+        verwaltung: mieteStart.ruecklagePA, hausverwaltung: mieteStart.hausverwaltungPA,
+        sondertilgung: sondertilgung, beitragInstrument: beitragInstrument, cashflow: cashflow, nachschussKumuliert: summeEkNachschuss,
+        restschuldAnfang: rsAnf, restschuld: restschuld, tilgungsinstrument: tilgungsinstrumentBestand,
+        eingezahltInstrument: summeEingezahltInstrument,
+        immoWert: kaufpreisGesamt * Math.pow(1 + wertsteigerung, jahr)
+      });
+    }
+
+    var target = jahresVerlauf.length >= 12 ? jahresVerlauf[11] : jahresVerlauf[jahresVerlauf.length - 1];
+    var effectiveYears = 12;
+    var kpiNetto = 0, renditePA = 0, ekBasis = 0;
+    if(target){
+      /* Im Tilgungsersatz-Modus zaehlt der aufgebaute Instrument-Bestand als
+         zusaetzliches Vermoegen mit (er hat ja die Sondertilgung ersetzt). */
+      kpiNetto = target.immoWert - target.restschuld - eigenkapital - target.nachschussKumuliert + (target.tilgungsinstrument || 0);
+      ekBasis = eigenkapital + 0.5 * target.nachschussKumuliert;
+      if(ekBasis > 0) renditePA = (Math.pow(1 + Math.max(0, kpiNetto / ekBasis), 1 / effectiveYears) - 1) * 100;
+    }
+
+    return {
+      invest: invest, kaufpreisInklNk: kaufpreisInklNk,
+      basisBoden: afaBasen.basisBoden, basisSanierung: basisSanierung, basisAltsubstanz: basisAltsubstanz,
+      mieteStart: mieteStart, jahresVerlauf: jahresVerlauf, monatsVerlaufJ1: monatsVerlaufJ1,
+      target: target, kpi: { ekAnfang: eigenkapital, ekBasis: ekBasis, nettoRendite: kpiNetto, renditePA: renditePA, betrachtungsJahre: effectiveYears, tilgungsinstrument: (target && target.tilgungsinstrument) || 0, eingezahltInstrument: (target && target.eingezahltInstrument) || 0 }
+    };
+  }
+
+  window.ibEngine = { berechneImmobilie: berechneImmobilie };
+})();
+/* =========================================================================
+   NEUBERECHNUNG
+   Liest alle blau hinterlegten Eingabefelder aus, ruft den Rechenmotor
+   (window.ibEngine) auf und schreibt das Ergebnis in die vorhandenen
+   Anzeigefelder von Abschnitt 1–3 (Beschriftungen/Struktur unveraendert).
+   ========================================================================= */
+(function(){
+  var status = document.getElementById('ib-status');
+  var meldeZeit;
+  function melden(text){
+    if(!status) return;
+    status.textContent = text;
+    status.classList.add('ib-status--an');
+    clearTimeout(meldeZeit);
+    meldeZeit = setTimeout(function(){ status.classList.remove('ib-status--an'); }, 2200);
+  }
+
+  function set(id, text){
+    var el = document.getElementById(id);
+    if(el) el.textContent = text;
+  }
+  function eur0(n){ return Math.round(n || 0).toLocaleString('de-DE') + ' €'; }
+  function eur0s(n){ /* mit Vorzeichen */ var r = Math.round(n || 0); return (r >= 0 ? '' : '−') + Math.abs(r).toLocaleString('de-DE') + ' €'; }
+  function pct1(n){ return (n || 0).toLocaleString('de-DE', {minimumFractionDigits:1, maximumFractionDigits:1}) + ' %'; }
+  function pct2(n){ return (n || 0).toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' %'; }
+  function zahl0(n){ return Math.round(n || 0).toLocaleString('de-DE'); }
+  function zahl0s(n){ var r = Math.round(n || 0); return (r >= 0 ? '' : '-') + Math.abs(r).toLocaleString('de-DE'); }
+
+  window.ibBerechnen = function(silent){
+    var doc = document.querySelector('.ib-doc');
+    if(!doc) return;
+    var $ = function(id){ return document.getElementById(id); };
+    var Z = function(id){ return window.ibZahl($(id)); };
+
+    /* ---------- Eingaben einlesen ---------- */
+    var flaeche = Z('ib-gesamtflaeche');
+    var vor1925 = !!($('ib-baujahr-vor1925') && $('ib-baujahr-vor1925').classList.contains('ib-cb--on'));
+    var wertsteigerung = Z('ib-wertsteigerung');
+    var kaufpreis = Z('ib-kaufpreis-einheit');
+    var stellplatzPreis = Z('ib-kaufpreis-stellplatz');
+    var moebelPreis = 0; /* Feld "Möbel" wurde aus der Oberfläche entfernt */
+    var notarPz = Z('ib-notarkosten-satz');
+    var grestPz = Z('ib-grest-satz');
+    var beratungPz = Z('ib-beratungshonorar-satz');
+    var bauzeitPz = Z('ib-bauzeitzinsen-satz');
+    var mieteQm = Z('ib-kaltmiete-qm');
+    var stellplatzMiete = Z('ib-miete-stellplatz');
+    var hausverwaltungPm = Z('ib-hausverwaltung');
+    var mietsteigerung = Z('ib-mietsteigerung');
+    var ruecklagePa = Z('ib-ruecklage');
+    var bodenanteilPz = Z('ib-bodenanteil-satz');
+    var altsubstanzPz = Z('ib-altsubstanz-satz');
+    var afaAltsubstanzPz = Z('ib-afa-altsubstanz');
+    var zve = Z('ib-zve-1-4');
+    var isSplitting = $('ib-splitting') ? /ja/i.test($('ib-splitting').textContent) : true;
+    var kiStSatz = Z('ib-kirchensteuer-satz');
+    var eigenkapital = Z('ib-eigenkapital');
+    var hdNominalzins = Z('ib-hd-nominalzins');
+    var hdTilgung = Z('ib-hd-tilgung');
+    var kfwKapitalbedarf = Z('ib-kfw-kapitalbedarf');
+    var kfwNominalzins = Z('ib-kfw-nominalzins');
+    var kfwTilgung = Z('ib-kfw-tilgung');
+    var kfwTilgungszuschuss = Z('ib-kfw-tilgungszuschuss');
+    var kfwZuschussFlex = Z('ib-kfw-zuschuss-flex');
+    var modusSondertilgung = !$('ib-wahl-ersatz') || $('ib-wahl-ersatz').getAttribute('aria-checked') !== 'true';
+    var kapitalmarktrendite = Z('ib-kapitalmarktrendite');
+
+    var sanierungsanteilPz = Math.max(0, 100 - bodenanteilPz - altsubstanzPz);
+
+    /* ---------- Investition & Finanzierung ---------- */
+    var invZw = window.ibEngine.berechneImmobilie({
+      kaufpreis: kaufpreis, stellplatz: stellplatzPreis, moebel: moebelPreis,
+      notarPz: notarPz, grestPz: grestPz, beratungshonorarPz: beratungPz, bauzeitzinsenPz: bauzeitPz,
+      eigenkapital: eigenkapital, darlehen: [],
+      anteilSanierung: sanierungsanteilPz, anteilAltsubstanz: altsubstanzPz, stellplatzSanierungsanteil: true,
+      afaSatzAlt: afaAltsubstanzPz / 100,
+      wertsteigerung: wertsteigerung, mietsteigerung: mietsteigerung,
+      zve: zve, isSplitting: isSplitting, kirchensteuer: kiStSatz,
+      flaeche: flaeche, mieteQm: mieteQm, stellplatzMietePm: stellplatzMiete,
+      hausverwaltungPm: hausverwaltungPm, ruecklagePa: ruecklagePa
+    });
+    var invest = invZw.invest;
+    var kaufpreisInklNk = invZw.kaufpreisInklNk;
+
+    var fremdkapitalbedarf = Math.max(0, kaufpreisInklNk - eigenkapital);
+    var kapitalbedarfNachZuschuss = Math.max(0, fremdkapitalbedarf - kfwZuschussFlex);
+    var kredithoeheHaupt = Math.max(0, kapitalbedarfNachZuschuss - kfwKapitalbedarf);
+    var summeDarlehen = kredithoeheHaupt + kfwKapitalbedarf;
+    var durchschnittszins = summeDarlehen > 0
+      ? (hdNominalzins * kredithoeheHaupt + kfwNominalzins * (kfwKapitalbedarf - kfwTilgungszuschuss)) / summeDarlehen
+      : 0;
+
+    var darlehenCfg = [];
+    if(kredithoeheHaupt > 0) darlehenCfg.push({ name: 'Hauptdarlehen', amount: kredithoeheHaupt, zins: hdNominalzins, tilg: hdTilgung, isKfw: false, bindung: 10 });
+    if(kfwKapitalbedarf > 0) darlehenCfg.push({ name: 'KFW 261', amount: kfwKapitalbedarf, zins: kfwNominalzins, tilg: kfwTilgung, isKfw: true, zuschuss: kfwTilgungszuschuss, bindung: 10 });
+
+    /* ---------- Vollstaendige Simulation ---------- */
+    var res = window.ibEngine.berechneImmobilie({
+      kaufpreis: kaufpreis, stellplatz: stellplatzPreis, moebel: moebelPreis,
+      notarPz: notarPz, grestPz: grestPz, beratungshonorarPz: beratungPz, bauzeitzinsenPz: bauzeitPz,
+      eigenkapital: eigenkapital, darlehen: darlehenCfg,
+      anteilSanierung: sanierungsanteilPz, anteilAltsubstanz: altsubstanzPz, stellplatzSanierungsanteil: true,
+      afaSatzAlt: afaAltsubstanzPz / 100,
+      wertsteigerung: wertsteigerung, mietsteigerung: mietsteigerung,
+      zve: zve, isSplitting: isSplitting, kirchensteuer: kiStSatz,
+      flaeche: flaeche, mieteQm: mieteQm, stellplatzMietePm: stellplatzMiete,
+      hausverwaltungPm: hausverwaltungPm, ruecklagePa: ruecklagePa,
+      ueberschussInTilgung: modusSondertilgung, kapitalmarktrendite: kapitalmarktrendite
+    });
+
+    var jv = res.jahresVerlauf;
+
+    /* ---------- Abschnitt 1: abgeleitete Werte ---------- */
+    set('ib-notarkosten', eur0(invest.notarBetrag));
+    set('ib-grest', eur0(invest.grestBetrag));
+    set('ib-beratungshonorar', eur0(invest.beratungBetrag));
+    set('ib-bauzeitzinsen', eur0(invest.bauzeitzinsenBetrag));
+    set('ib-kaufpreis-inkl-nk', eur0(kaufpreisInklNk));
+    set('ib-fin-kaufpreis-inkl-nk', eur0(kaufpreisInklNk));
+
+    set('ib-kaltmiete-pm', eur0(mieteQm * flaeche));
+
+    set('ib-bodenanteil', eur0(res.basisBoden));
+    set('ib-altsubstanz', eur0(res.basisAltsubstanz));
+    set('ib-sanierungsanteil', eur0(res.basisSanierung));
+    set('ib-sanierungsanteil-satz', pct1(sanierungsanteilPz));
+
+    set('ib-fremdkapitalbedarf', eur0(fremdkapitalbedarf));
+    set('ib-kredithoehe', eur0(kredithoeheHaupt));
+    set('ib-durchschnittszins', pct2(durchschnittszins));
+
+    /* ---------- Abschnitt 2: 12-Jahres-Tabelle ---------- */
+    var ZEILEN = [
+      ['ib-z1',  function(j){ return j.zveVor; }],
+      ['ib-z2',  function(j){ return j.miete; }],
+      ['ib-z3',  function(j){ return -j.zinsen; }],
+      ['ib-z4',  function(j){ return -j.afaAltMoebel; }],
+      ['ib-z5',  function(j){ return -j.afaSan; }],
+      ['ib-z6',  function(j){ return j.verlust; }],
+      ['ib-z7',  function(j){ return j.zveNach; }],
+      ['ib-z8',  function(j){ return j.estVor; }],
+      ['ib-z9',  function(j){ return j.estNach; }],
+      ['ib-z10', function(j){ return j.ersparnisEst; }],
+      ['ib-z11', function(j){ return j.ersparnisSoli; }],
+      ['ib-z12', function(j){ return j.ersparnisKiSt; }],
+      ['ib-z13', function(j){ return j.steuerersparnis; }],
+      ['ib-z14', function(j){ return -j.verwaltung; }],
+      ['ib-z15', function(j){ return j.liqUeberschuss; }],
+      ['ib-z16', function(j){ return j.restschuldAnfang; }],
+      ['ib-z17', function(j){ return j.pflichtTilgung; }],
+      ['ib-z18', function(j){ return modusSondertilgung ? j.sondertilgung : j.beitragInstrument; }],
+      ['ib-z19', function(j){ return j.restschuld; }]
+    ];
+    ZEILEN.forEach(function(zeile){
+      var row = document.getElementById(zeile[0]);
+      if(!row) return;
+      var zellen = row.querySelectorAll('td.ib-t-v');
+      for(var i = 0; i < zellen.length; i++){
+        var j = jv[i];
+        zellen[i].textContent = j ? zahl0s(zeile[1](j)) : '–';
+      }
+    });
+
+    /* ---------- Abschnitt 3: Monatsebene ---------- */
+    var jahrGewaehlt = Math.max(1, Math.min(jv.length || 1, parseInt(Z('ib-monat-jahr'), 10) || 1));
+    var monatTxt = ($('ib-monat-monat') ? $('ib-monat-monat').textContent : '') || '';
+    var MONATE = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+    var monatIdx = MONATE.findIndex(function(m){ return monatTxt.toLowerCase().indexOf(m.toLowerCase()) === 0; });
+    if(monatIdx < 0) monatIdx = 0;
+
+    var eintrag = jv[jahrGewaehlt - 1] || jv[0] || {
+      miete: 0, zinsen: 0, afaSan: 0, afaAlt: 0, afaMoebel: 0, verlust: 0, steuerersparnis: 0,
+      pflichtTilgung: 0, verwaltung: 0
+    };
+
+    var mZins, mTilgung;
+    if(jahrGewaehlt === 1 && res.monatsVerlaufJ1 && res.monatsVerlaufJ1.length){
+      var monatsNr = monatIdx + 1;
+      var eintraegeMonat = res.monatsVerlaufJ1.filter(function(m){ return m.monat === monatsNr; });
+      if(eintraegeMonat.length){
+        mZins = eintraegeMonat.reduce(function(s, m){ return s + m.zins; }, 0);
+        mTilgung = eintraegeMonat.reduce(function(s, m){ return s + m.tilgung; }, 0);
+      }
+    }
+    if(mZins == null) mZins = eintrag.zinsen / 12;
+    if(mTilgung == null) mTilgung = eintrag.pflichtTilgung / 12;
+
+    var mMiete = eintrag.miete / 12;
+    var mAfa = (eintrag.afaSan + eintrag.afaAlt + eintrag.afaMoebel) / 12;
+    var mVerlust = mMiete - mZins - mAfa;
+    var mSteuerersparnis = eintrag.steuerersparnis / 12;
+    var mInstandhaltung = eintrag.verwaltung / 12;
+    var mUeberschuss = mMiete + mSteuerersparnis - mZins - mTilgung - mInstandhaltung;
+
+    set('ib-m-nettokaltmiete', '+' + eur0(mMiete));
+    set('ib-m-zinsen', '-' + eur0(mZins));
+    set('ib-m-abschreibung', '-' + eur0(mAfa));
+    set('ib-m-verlust', eur0s(mVerlust));
+    set('ib-m-steuerersparnis', (mSteuerersparnis >= 0 ? '+' : '-') + eur0(Math.abs(mSteuerersparnis)));
+
+    set('ib-l-miete', '+' + eur0(mMiete));
+    set('ib-l-steuerersparnis', (mSteuerersparnis >= 0 ? '+' : '-') + eur0(Math.abs(mSteuerersparnis)));
+    set('ib-l-zinssatz', pct1(durchschnittszins));
+    set('ib-l-zinsen', '-' + eur0(mZins));
+    set('ib-l-tilgung', '-' + eur0(mTilgung));
+    set('ib-l-instandhaltung', '-' + eur0(mInstandhaltung));
+    set('ib-l-ueberschuss', (mUeberschuss >= 0 ? '+' : '-') + eur0(Math.abs(mUeberschuss)));
+
+    /* ---------- KPI + Fazit (immer nach 12 Jahren, wie ueberschrieben) ---------- */
+    var target = res.target;
+    if(target){
+      var mieteJ1 = jv[0] ? jv[0].bruttoMiete - (stellplatzMiete * 12) : mieteQm * flaeche * 12;
+      var mietrenditePz = kaufpreis > 0 ? (mieteQm * flaeche * 12 / kaufpreis) * 100 : 0;
+      set('ib-kpi-mietrendite', pct2(mietrenditePz));
+      set('ib-kpi-ekr-pa', pct2(res.kpi.renditePA));
+      var ekrGesamtPz = res.kpi.ekBasis > 0 ? (res.kpi.nettoRendite / res.kpi.ekBasis) * 100 : 0;
+      set('ib-kpi-ekr', pct2(ekrGesamtPz));
+
+      var wertsteigerungBetrag = target.immoWert - invest.kaufpreisGesamt;
+      var instrumentEndwert = res.kpi.tilgungsinstrument || 0;
+      var eingezahltInstr = res.kpi.eingezahltInstrument || 0;
+      var ertragInstr = instrumentEndwert - eingezahltInstr;
+      var elFazit = document.getElementById('ib-nettorendite');
+      if(elFazit){
+        var span = elFazit.querySelector('.ib-fazit-txt span');
+        var wert = elFazit.querySelector('.ib-fazit-wert');
+        var formelTxt = eur0(invest.kaufpreisGesamt) + ' + ' + eur0(wertsteigerungBetrag) + ' − ' + eur0(target.restschuld) + ' − ' + eur0(eigenkapital) + ' − ' + eur0(target.nachschussKumuliert);
+        /* Instrumentwert aufgeschluesselt: eingezahlt + Zinseszins-Rendite (siehe Wunsch) */
+        if(instrumentEndwert > 0) formelTxt += ' + ' + eur0(eingezahltInstr) + ' eingezahlt + ' + eur0(ertragInstr) + ' Rendite';
+        if(span) span.textContent = formelTxt;
+        if(wert) wert.textContent = eur0(res.kpi.nettoRendite);
+      }
+
+      var hintEl = document.getElementById('ib-ueberschuss-hint');
+      if(hintEl){
+        hintEl.innerHTML = modusSondertilgung
+          ? 'Der gesamte monatliche Überschuss fließt in die<br>Sondertilgung'
+          : 'Der gesamte monatliche Überschuss fließt in das<br>Tilgungsersatzinstrument';
+      }
+
+      /* ---------- Tortendiagramm ---------- */
+      var steuerersparnisSumme = 0, mietueberhang = 0;
+      for(var i = 0; i < Math.min(12, jv.length); i++){
+        steuerersparnisSumme += jv[i].steuerersparnis;
+        mietueberhang += jv[i].miete - jv[i].zinsen - jv[i].verwaltung;
+      }
+      var ergebnis = [
+        { wert: eigenkapital, fill: 'url(#ib-g-ek)', seite: 'rechts', ly: 106,
+          zeilen: [eur0(eigenkapital), 'Eigenkapital anf.', 'eingebracht'] },
+        { wert: target.restschuld, fill: 'url(#ib-g-rest)', seite: 'rechts', ly: 156,
+          zeilen: [eur0(target.restschuld), 'Restschuld'] },
+        { wert: mietueberhang, fill: 'url(#ib-g-miet)', seite: 'links', ly: 168,
+          zeilen: [eur0s(mietueberhang), 'Mietüberhang'] },
+        { wert: steuerersparnisSumme, fill: 'url(#ib-g-steuer)', seite: 'links', ly: 123,
+          zeilen: [eur0(steuerersparnisSumme), 'Steuerersparnis'] },
+        { wert: kfwTilgungszuschuss, fill: 'url(#ib-g-kfw)', seite: 'links', ly: 78,
+          zeilen: [eur0(kfwTilgungszuschuss), 'KFW-Zuschuss'] },
+        { wert: wertsteigerungBetrag, fill: 'url(#ib-g-wert)', seite: 'links', ly: 33,
+          zeilen: [eur0(wertsteigerungBetrag), 'Wertsteigerung'] },
+        { wert: target.nachschussKumuliert, fill: 'url(#ib-g-ek)', seite: 'rechts', ly: 50,
+          zeilen: [eur0(target.nachschussKumuliert), 'Eigenkapital mon.', 'eingebracht'] }
+      ];
+      /* Nur sichtbar, wenn "Überschüsse in ein Tilgungsersatzinstrument"
+         gewaehlt wurde und sich tatsaechlich ein Bestand aufgebaut hat.
+         Die eingegebene Rendite gilt bereits als Nettorendite (keine
+         weitere Steuerkuerzung). Rendite-Anteil = Endwert minus Summe
+         der Einzahlungen, das umfasst automatisch den Zinseszinseffekt. */
+      if(instrumentEndwert > 0){
+        ergebnis.push({ wert: instrumentEndwert, fill: 'url(#ib-g-steuer)', seite: 'links', ly: 205,
+          zeilen: [eur0(instrumentEndwert), 'Tilgungsinstrument'] });
+      }
+      var summeAbs = ergebnis.reduce(function(s, d){ return s + Math.abs(d.wert); }, 0);
+      ergebnis.forEach(function(d){ d.zeilen.push((summeAbs > 0 ? Math.round(Math.abs(d.wert) / summeAbs * 100) : 0) + '%'); });
+      if(window.ibRenderPie) window.ibRenderPie(ergebnis);
+    }
+
+    if(!silent) melden('Werte aktualisiert');
+  };
+})();
+
+/* Erstberechnung direkt nach dem Laden, damit alle Felder von Anfang an konsistent sind. */
+window.ibBerechnen(true);
+
+
+
+
+/* =========================================================================
+   EINSTIEGSHINWEISE – vier Schritte, danach dauerhaft weg
+   ========================================================================= */
+(function(){
+  var SCHRITTE = [
+    { ziel: '#ib-projekt',
+      titel: 'Ein Objekt aus unserer Liste wählen',
+      text:  'Oben wählen Sie ein Projekt, darunter die konkrete Wohnung. Kaufpreis, Wohnfläche, Miete und Sanierungsanteil kommen dann aus unserer Datenbank und stehen sofort in der Berechnung.' },
+
+    { ziel: '#ib-kaufpreis-einheit',
+      titel: 'Oder Ihre eigenen Zahlen eintragen',
+      text:  'Sie sind nicht an unsere Objekte gebunden. Jeden blau hinterlegten Wert dürfen Sie einfach überschreiben – Kaufpreis, Fläche, Miete, Zinssatz. So rechnen Sie mit demselben Werkzeug auch ein ganz anderes Denkmalobjekt durch.' },
+
+    { ziel: '#ib-zve-1-4',
+      titel: 'Ihre Steuerdaten ergänzen',
+      text:  'Tragen Sie Ihr zu versteuerndes Einkommen ein und ob Sie zusammen veranlagt werden. Daraus ergibt sich Ihre persönliche Steuerersparnis – bei einer Denkmalimmobilie der größte Hebel.' },
+
+    { ziel: '#ib-eigenkapital',
+      titel: 'Blau heißt: dürfen Sie ändern',
+      text:  'Alles Blaue ist Eingabe – entweder aus der Datenbank vorbelegt oder von Ihnen frei gesetzt. Weiße und graue Werte rechnet das Blatt selbst aus. Sobald Sie ein Feld verlassen, aktualisieren sich Steuerersparnis, Liquidität und Rendite auf allen drei Seiten. Probieren Sie ruhig aus – mit „Zurücksetzen" oben sind Sie wieder am Anfang.',
+      alleFelder: true }
+  ];
+  /* true  = Hinweise erscheinen bei JEDEM Aufruf der Seite
+     false = nur beim allerersten Besuch, danach nie wieder            */
+  var IMMER_ZEIGEN = true;
+  var SPEICHER = 'ib-hinweise-gesehen';
+
+  var kasten = document.getElementById('ib-tour');
+  var elPunkte = document.getElementById('ib-tour-punkte');
+  if(!kasten) return;
+  var elNr    = document.getElementById('ib-tour-nr'),
+      elT     = document.getElementById('ib-tour-t'),
+      elB     = document.getElementById('ib-tour-b'),
+      btnW    = document.getElementById('ib-tour-weiter'),
+      btnZu   = document.getElementById('ib-tour-zu'),
+      pfeil   = kasten.querySelector('.ib-tour-pfeil'),
+      i = 0, ziel = null;
+
+  function gespeichert(){ try{ return localStorage.getItem(SPEICHER) === '1'; }catch(e){ return false; } }
+  function speichern(){ try{ localStorage.setItem(SPEICHER, '1'); }catch(e){} }
+
+  function zielAus(){ if(ziel){ ziel.classList.remove('ib-tour-ziel'); ziel = null; } }
+
+  function zeigen(k){
+    var s = SCHRITTE[k];
+    ziel && zielAus();
+    ziel = document.querySelector(s.ziel);
+    if(!ziel) return beenden();
+
+    ziel.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    ziel.classList.add('ib-tour-ziel');
+
+    elNr.textContent = 'Schritt ' + (k+1) + ' von ' + SCHRITTE.length;
+    if(elPunkte){
+      elPunkte.innerHTML = '';
+      for(var pi = 0; pi < SCHRITTE.length; pi++){
+        var pt = document.createElement('i');
+        if(pi === k) pt.className = 'ib-an';
+        elPunkte.appendChild(pt);
+      }
+    }
+    elT.textContent = s.titel;
+    elB.textContent = s.text;
+    btnW.textContent = (k === SCHRITTE.length - 1) ? 'Verstanden' : 'Weiter';
+
+    var doc = document.querySelector('.ib-doc');
+    if(doc) doc.classList.toggle('ib-felder-zeigen', !!s.alleFelder);
+
+    kasten.classList.add('ib-tour--an');
+    kasten.setAttribute('aria-hidden', 'false');
+    setTimeout(platzieren, 320);
+  }
+
+  function platzieren(){
+    if(!ziel) return;
+    var z = ziel.getBoundingClientRect(), t = kasten.getBoundingClientRect(), rand = 12;
+    /* oben Platz fuer die Werkzeugleiste lassen */
+    var leiste = document.querySelector('.ib-werkzeuge');
+    var obenFrei = leiste ? leiste.getBoundingClientRect().bottom + 10 : rand;
+    kasten.classList.remove('ib-tour--unten');
+    var links = z.left + z.width/2 - t.width/2;
+    var oben  = z.top - t.height - 12;
+    if(oben < Math.max(rand, obenFrei)){ oben = z.bottom + 12; kasten.classList.add('ib-tour--unten'); }
+    links = Math.max(rand, Math.min(links, window.innerWidth - t.width - rand));
+    kasten.style.left = links + 'px';
+    kasten.style.top  = oben + 'px';
+    pfeil.style.left  = (z.left + z.width/2 - links) + 'px';
+  }
+
+  function beenden(){
+    zielAus();
+    var doc = document.querySelector('.ib-doc');
+    if(doc) doc.classList.remove('ib-felder-zeigen');
+    kasten.classList.remove('ib-tour--an');
+    kasten.setAttribute('aria-hidden', 'true');
+    speichern();
+  }
+
+  btnW.addEventListener('click', function(){
+    i++;
+    if(i >= SCHRITTE.length) beenden(); else zeigen(i);
+  });
+  btnZu.addEventListener('click', beenden);
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') beenden(); });
+  window.addEventListener('resize', platzieren);
+  window.addEventListener('scroll', platzieren, true);
+
+  window.ibHinweiseStarten = function(){ i = 0; zeigen(0); };
+  var btnH = document.getElementById('ib-btn-hinweise');
+  if(btnH) btnH.addEventListener('click', window.ibHinweiseStarten);
+
+  if(IMMER_ZEIGEN || !gespeichert()) setTimeout(function(){ zeigen(0); }, 250);
+})();
+
+
+/* =========================================================================
+   ERKLAERVIDEO – oeffnen, schliessen, verschieben
+   ========================================================================= */
+(function(){
+  var fenster = document.getElementById('ib-video');
+  if(!fenster) return;
+  var griff  = document.getElementById('ib-video-griff'),
+      btnZu  = document.getElementById('ib-video-zu'),
+      btnAuf = document.getElementById('ib-btn-video'),
+      play   = document.getElementById('ib-video-play'),
+      hinweis= document.getElementById('ib-video-hinweis');
+  var SPEICHER = 'ib-video-zu';
+
+  function zu(){ try{ return localStorage.getItem(SPEICHER) === '1'; }catch(e){ return false; } }
+  function merken(v){ try{ localStorage.setItem(SPEICHER, v); }catch(e){} }
+
+  function oeffnen(){
+    fenster.classList.add('ib-video--an');
+    fenster.setAttribute('aria-hidden', 'false');
+    merken('0');
+  }
+  function schliessen(){
+    fenster.classList.remove('ib-video--an');
+    fenster.setAttribute('aria-hidden', 'true');
+    merken('1');
+  }
+
+  btnZu.addEventListener('click', schliessen);
+  if(btnAuf) btnAuf.addEventListener('click', function(){
+    /* zurueck an die Ausgangsecke, falls es weit weggeschoben wurde */
+    fenster.style.left = ''; fenster.style.top = '';
+    fenster.style.right = ''; fenster.style.bottom = '';
+    oeffnen();
+  });
+
+  /* Platzhalter: solange kein Video eingebunden ist */
+  if(play) play.addEventListener('click', function(){
+    if(!hinweis) return;
+    hinweis.textContent = 'Noch kein Video hinterlegt – im Quelltext bei „ERKLÄRVIDEO" eintragen.';
+    hinweis.style.color = '#ffd25f';
+  });
+
+  /* ---- Verschieben (Maus und Finger) ---- */
+  var zieht = false, dx = 0, dy = 0;
+  griff.addEventListener('pointerdown', function(e){
+    if(e.target.closest('.ib-video-zu')) return;
+    var r = fenster.getBoundingClientRect();
+    /* von rechts/unten auf links/oben umstellen, damit das Ziehen sauber laeuft */
+    fenster.style.right = 'auto'; fenster.style.bottom = 'auto';
+    fenster.style.left = r.left + 'px'; fenster.style.top = r.top + 'px';
+    dx = e.clientX - r.left; dy = e.clientY - r.top;
+    zieht = true;
+    griff.setPointerCapture(e.pointerId);
+  });
+  griff.addEventListener('pointermove', function(e){
+    if(!zieht) return;
+    e.preventDefault();
+    var r = fenster.getBoundingClientRect(), rand = 6;
+    var x = Math.max(rand, Math.min(e.clientX - dx, window.innerWidth  - r.width  - rand));
+    var y = Math.max(rand, Math.min(e.clientY - dy, window.innerHeight - r.height - rand));
+    fenster.style.left = x + 'px';
+    fenster.style.top  = y + 'px';
+  });
+  function losLassen(e){ if(zieht){ zieht = false; try{ griff.releasePointerCapture(e.pointerId); }catch(err){} } }
+  griff.addEventListener('pointerup', losLassen);
+  griff.addEventListener('pointercancel', losLassen);
+
+  /* beim ersten Besuch mit anzeigen, sobald die Hinweise durch sind */
+  if(!zu()) setTimeout(oeffnen, 1200);
+})();
+
+</script>
+
+</body>
+</html>
