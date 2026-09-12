@@ -1,10 +1,6 @@
 <!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Musterberechnung Denkmalimmobilie</title>
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsuites@4/dist/jsuites.min.css" type="text/css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jspreadsheet-ce@5/dist/jspreadsheet.min.css" type="text/css">
-<script src="https://cdn.jsdelivr.net/npm/jsuites@4/dist/jsuites.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspreadsheet-ce@5/dist/index.min.js"></script>
 <style>
 
 @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&family=Inconsolata:wght@400;500;600;700&display=swap');
@@ -1511,12 +1507,27 @@ a.ib-btn{ text-decoration: none; }   /* Rueckkehr-Knopf ist ein Link */
   #ai-status.ai-ok{ color: var(--ai-ok); }
   #ai-status.ai-fehler{ color: var(--ai-fehler); }
 
-  .ai-hinweis{ font-size: 12px; color: #667; padding: 8px 18px 4px; }
-  #ai-grid-wrap{ padding: 0 18px 24px; }
-  #ai-sheet{ background: #fff; border: 1px solid var(--ai-rand); border-radius: 8px; overflow: auto; }
+  #ai-excel-wrap{ padding: 8px 18px 24px; max-width: 720px; }
+  .ai-schritt{ display: flex; gap: 16px; padding: 20px 0; border-bottom: 1px solid var(--ai-rand); }
+  .ai-schritt:last-of-type{ border-bottom: 0; }
+  .ai-schritt-nr{
+    flex: none; width: 30px; height: 30px; border-radius: 50%;
+    background: var(--ai-blau); color: #fff; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+  }
+  .ai-schritt h3{ margin: 0 0 6px; font-size: 15px; }
+  .ai-schritt p{ margin: 0 0 12px; font-size: 13px; color: #556; line-height: 1.5; }
+  .ai-btn--haupt{ background: var(--ai-blau); color: #fff; padding: 9px 16px; }
+  .ai-btn--haupt:hover{ background: var(--ai-blau-dk); }
+  #ai-datei-input{ font-size: 13px; }
+  #ai-vorschau{ margin-top: 8px; padding: 16px 18px; background: #fff; border: 1px solid var(--ai-rand); border-radius: 8px; }
+  #ai-vorschau h3{ margin: 0 0 8px; font-size: 14px; }
+  #ai-vorschau ul{ margin: 0 0 12px; padding-left: 20px; font-size: 13.5px; }
+  #ai-vorschau li{ margin-bottom: 4px; }
 
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -3834,20 +3845,35 @@ if(window.ibSupabaseLaden) window.ibSupabaseLaden();
   <div id="ai-topbar">
     <h1>Preisliste bearbeiten</h1>
     <span class="ai-user" id="ai-user"></span>
-    <button class="ai-btn" id="ai-btn-neuladen">Neu laden</button>
-    <button class="ai-btn" id="ai-btn-speichern" style="color:#1a7f3c">Speichern</button>
     <button class="ai-btn ai-btn--ghost" id="ai-btn-logout">Abmelden</button>
   </div>
   <div id="ai-status"></div>
-  <p class="ai-hinweis">
-    Funktioniert wie eine normale Tabelle: Zellen/Bereiche mit der Maus markieren (auch mehrere),
-    <b>Strg/Cmd+C</b> zum Kopieren, <b>Strg/Cmd+X</b> zum Ausschneiden, <b>Strg/Cmd+V</b> zum Einfügen –
-    auch direkt aus und nach Excel/Google Sheets. Rechtsklick öffnet das Menü für „Zeile einfügen/löschen".
-    Die Spalte <b>ID</b> ganz links bitte nicht überschreiben (steuert, welcher Datensatz gespeichert wird);
-    leer lassen bei neuen Zeilen. Änderungen werden erst mit „Speichern" in die Datenbank übernommen.
-  </p>
-  <div id="ai-grid-wrap">
-    <div id="ai-sheet"></div>
+
+  <div id="ai-excel-wrap">
+    <div class="ai-schritt">
+      <div class="ai-schritt-nr">1</div>
+      <div>
+        <h3>Aktuelle Preisliste herunterladen</h3>
+        <p>Lädt die komplette Liste als Excel-Datei herunter – bearbeiten wie gewohnt (Zeilen einfügen/löschen, Copy-Paste aus anderen Quellen, Formeln zum Rechnen usw.).</p>
+        <button class="ai-btn ai-btn--haupt" id="ai-btn-download">⬇ Als Excel herunterladen</button>
+      </div>
+    </div>
+
+    <div class="ai-schritt">
+      <div class="ai-schritt-nr">2</div>
+      <div>
+        <h3>Bearbeitete Datei wieder hochladen</h3>
+        <p>Die erste Zeile (Überschriften) bitte unverändert lassen – danach werden die Spalten automatisch erkannt, auch wenn die Reihenfolge abweicht. Die Spalte <b>ID</b> steuert, welcher Datensatz aktualisiert wird: leer lassen bei neuen Zeilen, vorhandene ID beibehalten zum Ändern, Zeile komplett löschen zum Entfernen aus der Datenbank.</p>
+        <input type="file" id="ai-datei-input" accept=".xlsx,.xls">
+      </div>
+    </div>
+
+    <div id="ai-vorschau" style="display:none">
+      <h3>Vorschau</h3>
+      <div id="ai-vorschau-text"></div>
+      <button class="ai-btn ai-btn--haupt" id="ai-btn-uebernehmen" style="background:#1a7f3c;border-color:#1a7f3c">✓ Jetzt in Datenbank übernehmen</button>
+      <button class="ai-btn" id="ai-btn-abbrechen">Abbrechen</button>
+    </div>
   </div>
 </div>
 
@@ -3857,12 +3883,6 @@ if(window.ibSupabaseLaden) window.ibSupabaseLaden();
   var SUPABASE_KEY = 'sb_publishable_auwdfO8FDX7_MUmk7sBakA_4DWcu-jF';
   var client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  var BUNDESLAENDER = [
-    'Baden-Württemberg','Bayern','Berlin','Brandenburg','Bremen','Hamburg','Hessen',
-    'Mecklenburg-Vorp.','Niedersachsen','Nordrhein-Westfalen','Rheinland-Pfalz',
-    'Saarland','Sachsen','Sachsen-Anhalt','Schleswig-Holstein','Thüringen'
-  ];
-
   var FELDER = [
     'id','objektname','typ','bezeichnung','lage','zimmer','wohnflaeche_qm',
     'kaufpreis_einheit','kueche_moebel','stellplatz_kaufpreis','stellplatz_miete_pm',
@@ -3871,48 +3891,28 @@ if(window.ibSupabaseLaden) window.ibSupabaseLaden();
     'afa_altsubstanz_pz','hausverwaltung_pm','wertsteigerung_pa_pz',
     'mietsteigerung_pa_pz','bundesland','grunderwerbsteuer_pz','verfuegbar','fertigstellung'
   ];
-
-  var SPALTEN_DEF = [
-    { type: 'text', title: 'ID', width: 55, readOnly: true },
-    { type: 'text', title: 'Objekt', width: 170 },
-    { type: 'dropdown', title: 'Typ', width: 95, source: ['Wohnung', 'Stellplatz'] },
-    { type: 'text', title: 'Einheit', width: 100 },
-    { type: 'text', title: 'Lage', width: 100 },
-    { type: 'numeric', title: 'Zimmer', width: 70 },
-    { type: 'numeric', title: 'Wohnfl. m²', width: 90, mask: '#.##0,00', decimal: ',' },
-    { type: 'numeric', title: 'Kaufpreis €', width: 105, mask: '#.##0,00', decimal: ',' },
-    { type: 'numeric', title: 'Küche/Möbel €', width: 105, mask: '#.##0,00', decimal: ',' },
-    { type: 'numeric', title: 'Stellpl. Kaufpr. €', width: 110, mask: '#.##0,00', decimal: ',' },
-    { type: 'numeric', title: 'Stellpl. Miete €', width: 105, mask: '#.##0,00', decimal: ',' },
-    { type: 'numeric', title: 'Kaltmiete/m² €', width: 100, mask: '#.##0,00', decimal: ',' },
-    { type: 'numeric', title: 'Kaltmiete p.m. €', width: 105, mask: '#.##0,00', decimal: ',' },
-    { type: 'numeric', title: 'Boden %', width: 80, mask: '#.##0,00', decimal: ',' },
-    { type: 'numeric', title: 'Altsubst. %', width: 85, mask: '#.##0,00', decimal: ',' },
-    { type: 'numeric', title: 'Sanierung %', width: 90, mask: '#.##0,00', decimal: ',' },
-    { type: 'numeric', title: 'Neubau %', width: 85, mask: '#.##0,00', decimal: ',' },
-    { type: 'numeric', title: 'Baujahr', width: 75 },
-    { type: 'dropdown', title: 'Baujahrsklasse', width: 115, source: ['vor 1925', 'ab 1925', 'Neubau'] },
-    { type: 'numeric', title: 'AfA Altsubst. %', width: 100, mask: '#.##0,00', decimal: ',' },
-    { type: 'numeric', title: 'Hausverw. €', width: 95, mask: '#.##0,00', decimal: ',' },
-    { type: 'numeric', title: 'Wertsteig. %', width: 90, mask: '#.##0,00', decimal: ',' },
-    { type: 'numeric', title: 'Mietsteig. %', width: 90, mask: '#.##0,00', decimal: ',' },
-    { type: 'dropdown', title: 'Bundesland', width: 150, source: BUNDESLAENDER },
-    { type: 'numeric', title: 'GrESt %', width: 80, mask: '#.##0,00', decimal: ',' },
-    { type: 'checkbox', title: 'Verfügbar', width: 75 },
-    { type: 'text', title: 'Fertigstellung', width: 100 }
+  var TITEL = [
+    'ID','Objekt','Typ','Einheit','Lage','Zimmer','Wohnfl. m²','Kaufpreis €',
+    'Küche/Möbel €','Stellpl. Kaufpr. €','Stellpl. Miete €','Kaltmiete/m² €',
+    'Kaltmiete p.m. €','Boden %','Altsubst. %','Sanierung %','Neubau %','Baujahr',
+    'Baujahrsklasse','AfA Altsubst. %','Hausverw. €','Wertsteig. %','Mietsteig. %',
+    'Bundesland','GrESt %','Verfügbar','Fertigstellung'
   ];
+  var TEXT_FELDER = { id:1, objektname:1, typ:1, bezeichnung:1, lage:1, baujahrsklasse:1, bundesland:1 };
 
   var loginWrap = document.getElementById('ai-login-wrap');
   var app = document.getElementById('ai-app');
   var statusEl = document.getElementById('ai-status');
-  var sheet = null;
-  var idsBeimLaden = [];
+  var vorschauBox = document.getElementById('ai-vorschau');
+  var vorschauText = document.getElementById('ai-vorschau-text');
+  var ausstehendeAenderung = null; /* { bestehende, neue, geloeschteIds } */
 
   function status(text, art){
     statusEl.textContent = text || '';
     statusEl.className = art ? 'ai-' + art : '';
   }
 
+  /* ---------- Login ---------- */
   document.getElementById('ai-login-btn').addEventListener('click', anmelden);
   document.getElementById('ai-pass').addEventListener('keydown', function(e){ if(e.key === 'Enter') anmelden(); });
 
@@ -3922,7 +3922,6 @@ if(window.ibSupabaseLaden) window.ibSupabaseLaden();
     var fehlerEl = document.getElementById('ai-login-fehler');
     fehlerEl.textContent = '';
     if(!email || !pass){ fehlerEl.textContent = 'Bitte E-Mail und Passwort eingeben.'; return; }
-
     client.auth.signInWithPassword({ email: email, password: pass }).then(function(res){
       if(res.error){ fehlerEl.textContent = 'Anmeldung fehlgeschlagen: ' + res.error.message; return; }
       zeigeApp(res.data.session);
@@ -3937,99 +3936,170 @@ if(window.ibSupabaseLaden) window.ibSupabaseLaden();
     loginWrap.style.display = 'none';
     app.style.display = 'block';
     document.getElementById('ai-user').textContent = session.user.email;
-    if(!sheet) initSheet();
-    datenLaden();
   }
 
   client.auth.getSession().then(function(res){
     if(res.data && res.data.session) zeigeApp(res.data.session);
   });
 
-  function initSheet(){
-    sheet = jspreadsheet(document.getElementById('ai-sheet'), {
-      data: [[]],
-      columns: SPALTEN_DEF,
-      minSpareRows: 3,
-      freezeColumns: 4,
-      tableOverflow: true,
-      tableWidth: '100%',
-      tableHeight: 'calc(100vh - 150px)',
-      csvFileName: 'preisliste'
-    })[0];
-  }
-
-  function datenLaden(){
-    status('Lade Daten …');
+  /* =========================================================================
+     SCHRITT 1: HERUNTERLADEN
+     ========================================================================= */
+  document.getElementById('ai-btn-download').addEventListener('click', function(){
+    status('Lade aktuelle Daten …');
     client.from('einheiten').select('*').order('id', { ascending: true }).then(function(res){
       if(res.error){ status('Fehler beim Laden: ' + res.error.message, 'fehler'); return; }
       var rows = res.data || [];
-      idsBeimLaden = rows.map(function(r){ return String(r.id); });
-      var matrix = rows.map(function(r){
-        return FELDER.map(function(f){
+      var aoa = [TITEL];
+      rows.forEach(function(r){
+        aoa.push(FELDER.map(function(f){
           var v = r[f];
           if(v == null) return '';
-          if(f === 'verfuegbar') return v ? 1 : 0;
+          if(f === 'verfuegbar') return v ? 'ja' : '';
           return v;
-        });
+        }));
       });
-      sheet.setData(matrix);
-      status(rows.length + ' Zeilen geladen.', 'ok');
+      var ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = TITEL.map(function(){ return { wch: 16 }; });
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Preisliste');
+      var datum = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, 'preisliste_' + datum + '.xlsx');
+      status(rows.length + ' Zeilen heruntergeladen.', 'ok');
+    }).catch(function(err){
+      status('Unerwarteter Fehler: ' + err.message, 'fehler');
     });
-  }
-  document.getElementById('ai-btn-neuladen').addEventListener('click', function(){
-    if(confirm('Neu laden verwirft alle ungespeicherten Änderungen. Fortfahren?')) datenLaden();
   });
 
-  document.getElementById('ai-btn-speichern').addEventListener('click', speichern);
-
-  function leerZuNull(v){ return (v === '' || v === undefined) ? null : v; }
+  /* =========================================================================
+     SCHRITT 2: HOCHLADEN + VORSCHAU
+     ========================================================================= */
+  document.getElementById('ai-datei-input').addEventListener('change', function(e){
+    var datei = e.target.files[0];
+    if(!datei) return;
+    status('Lese Datei …');
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      try{
+        verarbeiteDatei(ev.target.result);
+      } catch(err){
+        status('Datei konnte nicht gelesen werden: ' + err.message, 'fehler');
+      }
+    };
+    reader.onerror = function(){ status('Datei konnte nicht gelesen werden.', 'fehler'); };
+    reader.readAsArrayBuffer(datei);
+  });
 
   function zuZahl(wert){
-    if(wert === null || wert === '') return null;
+    if(wert === null || wert === undefined || wert === '') return null;
     if(typeof wert === 'number') return wert;
     var s = String(wert).trim();
-    /* Nur als deutsches Format (Punkt=Tausender, Komma=Dezimal) behandeln,
-       wenn tatsaechlich ein Komma vorkommt - sonst ist "12000.5" schon eine
-       normale Zahl und darf nicht verstuemmelt werden. */
+    if(s === '') return null;
     if(s.indexOf(',') !== -1) s = s.replace(/\./g, '').replace(',', '.');
     var n = Number(s);
     return isNaN(n) ? null : n;
   }
-
-  function zeileZuObjekt(zeile){
-    var o = {};
-    FELDER.forEach(function(feld, i){
-      var wert = leerZuNull(zeile[i]);
-      if(feld === 'verfuegbar') wert = (wert === null) ? null : !!Number(wert);
-      else if(feld !== 'id' && feld !== 'objektname' && feld !== 'typ' && feld !== 'bezeichnung' &&
-              feld !== 'lage' && feld !== 'baujahrsklasse' && feld !== 'bundesland' && feld !== 'fertigstellung'){
-        wert = zuZahl(wert);
-      }
-      o[feld] = wert;
-    });
-    return o;
+  function zuDatum(wert){
+    if(wert === null || wert === undefined || wert === '') return null;
+    if(wert instanceof Date) return wert.toISOString().slice(0, 10);
+    var s = String(wert).trim();
+    var m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if(m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    return null;
+  }
+  function zuBool(wert){
+    if(wert === null || wert === undefined || wert === '') return null;
+    return /^(1|ja|true|wahr|x)$/i.test(String(wert).trim()) ? true : null;
   }
 
-  function speichern(){
-    var matrix = sheet.getData();
-    matrix = matrix.filter(function(z){ return z.some(function(v){ return v !== '' && v != null; }); });
+  function verarbeiteDatei(arrayBuffer){
+    var wb = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+    var ws = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+    if(!rows.length){ status('Die Datei enthält keine Daten.', 'fehler'); return; }
 
-    var objekte = matrix.map(zeileZuObjekt);
-    var bestehende = objekte.filter(function(o){ return o.id != null && o.id !== ''; })
-      .map(function(o){ return Object.assign({}, o, { id: Number(o.id) }); });
-    var neue = objekte.filter(function(o){ return o.id == null || o.id === ''; })
-      .map(function(o){ var k = Object.assign({}, o); delete k.id; return k; });
+    var kopf = rows[0].map(function(h){ return String(h || '').trim(); });
+    /* Spalten anhand der Ueberschrift zuordnen - Reihenfolge darf abweichen */
+    var spaltenIndex = {};
+    FELDER.forEach(function(feld, i){
+      var titel = TITEL[i];
+      var idx = kopf.indexOf(titel);
+      if(idx === -1) idx = kopf.findIndex(function(h){ return h.toLowerCase() === titel.toLowerCase(); });
+      spaltenIndex[feld] = idx;
+    });
+    var nichtGefunden = FELDER.filter(function(f){ return spaltenIndex[f] === -1; });
+    if(spaltenIndex.objektname === -1 || spaltenIndex.bezeichnung === -1){
+      status('Überschriften nicht erkannt – bitte die erste Zeile der heruntergeladenen Datei nicht verändern.', 'fehler');
+      return;
+    }
 
-    var idsJetzt = bestehende.map(function(o){ return String(o.id); });
-    var geloeschteIds = idsBeimLaden.filter(function(id){ return idsJetzt.indexOf(id) === -1; }).map(Number);
+    var datenZeilen = rows.slice(1).filter(function(z){
+      return z.some(function(v){ return String(v || '').trim() !== ''; });
+    });
 
-    status('Speichere …');
+    var objekte = datenZeilen.map(function(z){
+      var o = {};
+      FELDER.forEach(function(feld){
+        var idx = spaltenIndex[feld];
+        var wert = idx === -1 ? '' : z[idx];
+        if(wert === undefined) wert = '';
+        if(feld === 'verfuegbar') o[feld] = zuBool(wert);
+        else if(feld === 'fertigstellung') o[feld] = zuDatum(wert);
+        else if(TEXT_FELDER[feld]) o[feld] = (wert === '' ? null : String(wert).trim());
+        else o[feld] = zuZahl(wert);
+      });
+      return o;
+    }).filter(function(o){ return o.objektname || o.bezeichnung; });
+
+    status('Vergleiche mit Datenbank …');
+    client.from('einheiten').select('id').then(function(res){
+      if(res.error){ status('Fehler beim Abgleich: ' + res.error.message, 'fehler'); return; }
+      var idsAktuell = (res.data || []).map(function(r){ return String(r.id); });
+
+      var bestehende = objekte.filter(function(o){ return o.id != null; })
+        .map(function(o){ return Object.assign({}, o, { id: Number(o.id) }); });
+      var neue = objekte.filter(function(o){ return o.id == null; })
+        .map(function(o){ var k = Object.assign({}, o); delete k.id; return k; });
+      var idsInDatei = bestehende.map(function(o){ return String(o.id); });
+      var geloeschteIds = idsAktuell.filter(function(id){ return idsInDatei.indexOf(id) === -1; }).map(Number);
+
+      ausstehendeAenderung = { bestehende: bestehende, neue: neue, geloeschteIds: geloeschteIds };
+
+      var hinweisZeile = nichtGefunden.length
+        ? '<p style="color:#b3261e">Nicht erkannte Spalten (werden ignoriert): ' + nichtGefunden.join(', ') + '</p>' : '';
+      vorschauText.innerHTML =
+        '<ul>' +
+          '<li><b>' + bestehende.length + '</b> Zeilen werden aktualisiert</li>' +
+          '<li><b>' + neue.length + '</b> neue Zeilen werden angelegt</li>' +
+          '<li><b>' + geloeschteIds.length + '</b> Zeilen werden gelöscht (waren in der Datenbank, fehlen jetzt in der Datei)</li>' +
+        '</ul>' + hinweisZeile;
+      vorschauBox.style.display = 'block';
+      status('');
+    }).catch(function(err){
+      status('Unerwarteter Fehler beim Abgleich: ' + err.message, 'fehler');
+    });
+  }
+
+  document.getElementById('ai-btn-abbrechen').addEventListener('click', function(){
+    ausstehendeAenderung = null;
+    vorschauBox.style.display = 'none';
+    document.getElementById('ai-datei-input').value = '';
+    status('Abgebrochen – es wurde nichts verändert.');
+  });
+
+  document.getElementById('ai-btn-uebernehmen').addEventListener('click', function(){
+    if(!ausstehendeAenderung) return;
+    var a = ausstehendeAenderung;
+    if(a.geloeschteIds.length){
+      var ok = confirm(a.geloeschteIds.length + ' Zeile(n) werden aus der Datenbank gelöscht, weil sie in der hochgeladenen Datei fehlen. Fortfahren?');
+      if(!ok) return;
+    }
+    status('Übernehme Änderungen …');
     var aufgaben = [];
-    if(bestehende.length) aufgaben.push(client.from('einheiten').upsert(bestehende));
-    if(neue.length) aufgaben.push(client.from('einheiten').insert(neue));
-    if(geloeschteIds.length) aufgaben.push(client.from('einheiten').delete().in('id', geloeschteIds));
-
-    if(!aufgaben.length){ status('Nichts zu speichern.'); return; }
+    if(a.bestehende.length) aufgaben.push(client.from('einheiten').upsert(a.bestehende));
+    if(a.neue.length) aufgaben.push(client.from('einheiten').insert(a.neue));
+    if(a.geloeschteIds.length) aufgaben.push(client.from('einheiten').delete().in('id', a.geloeschteIds));
 
     Promise.all(aufgaben).then(function(ergebnisse){
       var fehler = ergebnisse.filter(function(r){ return r.error; });
@@ -4037,10 +4107,14 @@ if(window.ibSupabaseLaden) window.ibSupabaseLaden();
         status('Fehler beim Speichern: ' + fehler.map(function(f){ return f.error.message; }).join(' | '), 'fehler');
         return;
       }
-      status('Gespeichert.', 'ok');
-      datenLaden();
+      status('Übernommen: ' + a.bestehende.length + ' aktualisiert, ' + a.neue.length + ' neu, ' + a.geloeschteIds.length + ' gelöscht.', 'ok');
+      ausstehendeAenderung = null;
+      vorschauBox.style.display = 'none';
+      document.getElementById('ai-datei-input').value = '';
+    }).catch(function(err){
+      status('Unerwarteter Fehler beim Speichern: ' + err.message, 'fehler');
     });
-  }
+  });
 })();
 </script>
 
