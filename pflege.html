@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pflegebereich Berechnungstool</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Inconsolata:wght@400;500;600;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --balken:  #5E88A3;
+  --dunkel:  #2C4A5C;
+  --dunkel2: #233D4C;
+  --fill:    #D6E4EC;
+  --buehne:  #53565A;
+  --papier:  #FFFFFF;
+  --ton:     #F2F5F7;
+  --linie:   #C9D6DE;
+  --txt:     #141413;
+  --txt-leise:#5A6B75;
+  --zahl:    #3F3F76;
+  --gruen:   #C6E0B4;
+  --gruen-dk:#4F7A32;
+  --gelb:    #FFD25F;
+  --rot:     #B4443F;
+  --font: "Inter Tight", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --num:  "Inconsolata", ui-monospace, "SF Mono", Consolas, monospace;
+  color-scheme: light;
+}
+*{ box-sizing: border-box; }
+html,body{ margin:0; padding:0; }
+body{
+  background: var(--buehne); color: var(--txt); font-family: var(--font);
+  font-size: 15px; line-height: 1.5; -webkit-text-size-adjust:100%;
+}
+button, input, select, textarea{ font: inherit; color: inherit; }
+:focus-visible{ outline: 2px solid var(--balken); outline-offset: 2px; }
+a{ color: inherit; }
+
+/* ---------- Anmeldung ---------- */
+.anmeldung{ min-height:100svh; display:flex; align-items:center; justify-content:center; padding:32px 16px; }
+.anmeldung-karte{ width:100%; max-width:380px; background:var(--papier); padding:34px 32px 30px; box-shadow:0 10px 34px rgba(0,0,0,.35); }
+.marke{ display:flex; align-items:center; gap:10px; margin-bottom:26px; }
+.marke-zeichen{ width:30px; height:30px; flex:none; background:var(--dunkel); color:#fff; display:flex; align-items:center; justify-content:center; font-family:var(--num); font-weight:700; font-size:15px; }
+.marke-txt{ font-size:13px; line-height:1.25; }
+.marke-txt b{ display:block; font-weight:700; letter-spacing:.01em; }
+.marke-txt span{ color:var(--txt-leise); }
+.anmeldung h1{ font-size:20px; margin:0 0 4px; font-weight:700; }
+.anmeldung .vor{ color:var(--txt-leise); font-size:13.5px; margin:0 0 22px; }
+.feldgruppe{ display:grid; gap:5px; margin-bottom:15px; }
+.feldgruppe label{ font-size:12px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--txt-leise); }
+.eingabe{ width:100%; background:var(--fill); border:1px solid #000; padding:8px 10px; font-family:var(--num); font-size:15px; color:var(--zahl); }
+.eingabe::placeholder{ color:#7d8fa0; }
+.eingabe:focus{ background:#fff; }
+.knopf{ display:inline-flex; align-items:center; justify-content:center; gap:6px; border:1px solid var(--dunkel); background:var(--dunkel); color:#fff; padding:9px 16px; font-size:13.5px; font-weight:600; cursor:pointer; }
+.knopf:hover{ background:var(--dunkel2); }
+.knopf--breit{ width:100%; }
+.knopf--ghost{ background:transparent; color:var(--dunkel); }
+.knopf--ghost:hover{ background:var(--ton); }
+.knopf--gefahr{ background:#fff; color:var(--rot); border-color:var(--rot); }
+.knopf--gefahr:hover{ background:#fbeceb; }
+.fehler{ color:var(--rot); font-size:13px; margin-top:10px; min-height:1em; }
+
+/* ---------- App-Rahmen ---------- */
+#app{ display:none; min-height:100vh; }
+.rahmen{ display:flex; min-height:100vh; }
+.seitenleiste{ width:220px; flex:none; background:var(--dunkel); color:#fff; display:flex; flex-direction:column; }
+.sl-marke{ padding:18px 16px; display:flex; align-items:center; gap:10px; border-bottom:1px solid rgba(255,255,255,.12); }
+.sl-nav{ flex:1; padding:10px 0; overflow-y:auto; }
+.sl-item{ display:block; width:100%; text-align:left; background:none; border:0; color:#cfd9de; padding:11px 16px; font-size:14px; cursor:pointer; border-left:3px solid transparent; }
+.sl-item:hover{ background:rgba(255,255,255,.06); color:#fff; }
+.sl-item.aktiv{ background:var(--dunkel2); color:#fff; border-left-color:var(--gelb); font-weight:600; }
+.sl-fuss{ padding:14px 16px; border-top:1px solid rgba(255,255,255,.12); font-size:12px; color:#9fb0b8; }
+.sl-fuss button{ margin-top:8px; }
+
+.inhalt{ flex:1; background:var(--ton); overflow-y:auto; }
+.kopf{ background:#fff; border-bottom:1px solid var(--linie); padding:16px 28px; display:flex; align-items:center; gap:14px; }
+.kopf h1{ font-size:18px; margin:0; flex:1; }
+.kopf .rolle-badge{ font-size:12px; background:var(--fill); color:var(--zahl); padding:3px 9px; font-weight:600; }
+.status-zeile{ padding:8px 28px 0; font-size:13.5px; min-height:1.6em; }
+.status-zeile.ok{ color:var(--gruen-dk); }
+.status-zeile.fehler{ color:var(--rot); }
+.seite{ padding:20px 28px 48px; max-width:1100px; }
+.seite h2{ font-size:16px; margin:0 0 4px; }
+.seite .hinweis{ font-size:13px; color:var(--txt-leise); margin:0 0 18px; line-height:1.5; }
+
+/* ---------- Karten / Tabellen ---------- */
+.karten-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:14px; margin-bottom:20px; }
+.projekt-karte{ background:#fff; border:1px solid var(--linie); padding:16px; }
+.projekt-karte h3{ font-size:15px; margin:0 0 8px; }
+.badge{ display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; letter-spacing:.02em; text-transform:uppercase; }
+.badge--denkmal{ background:#E4D9C5; color:#6B4E1F; }
+.badge--qng{ background:#CBE4D6; color:#1F6B45; }
+.badge--sichtbar{ background:var(--gruen); color:var(--gruen-dk); }
+.badge--entwurf{ background:#eee; color:#777; }
+.projekt-karte .zeile{ font-size:13px; color:var(--txt-leise); margin-top:4px; }
+.projekt-karte .aktionen{ display:flex; gap:8px; margin-top:12px; }
+.projekt-karte .aktionen button{ font-size:12.5px; padding:6px 10px; }
+
+table.tbl{ width:100%; border-collapse:collapse; background:#fff; font-size:13.5px; }
+table.tbl th, table.tbl td{ border:1px solid var(--linie); padding:7px 10px; text-align:left; }
+table.tbl th{ background:var(--ton); font-weight:600; }
+table.tbl input, table.tbl select{ width:100%; border:1px solid transparent; background:transparent; padding:3px 4px; font-family:var(--num); }
+table.tbl input:focus, table.tbl select:focus{ background:var(--fill); border-color:#000; }
+
+.form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px 20px; max-width:640px; }
+.form-grid .voll{ grid-column:1/-1; }
+.modal-hg{ position:fixed; inset:0; background:rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; z-index:40; padding:20px; }
+.modal{ background:#fff; padding:26px 28px; max-width:640px; width:100%; max-height:88vh; overflow-y:auto; }
+.modal h2{ margin-top:0; }
+.modal-aktionen{ display:flex; gap:10px; margin-top:20px; }
+
+.schritt-leiste{ display:flex; gap:6px; margin-bottom:20px; }
+.schritt-leiste .s{ flex:1; text-align:center; padding:8px 6px; font-size:12.5px; font-weight:600; background:#e6ebee; color:var(--txt-leise); }
+.schritt-leiste .s.aktiv{ background:var(--balken); color:#fff; }
+.schritt-leiste .s.fertig{ background:var(--gruen); color:var(--gruen-dk); }
+
+.spalten-liste{ display:grid; gap:8px; margin:14px 0; }
+.spalten-zeile{ display:flex; align-items:center; gap:10px; font-size:13.5px; padding:7px 10px; background:#fff; border:1px solid var(--linie); }
+.spalten-zeile.unbekannt{ background:#fff8ea; border-color:var(--gelb); }
+.spalten-zeile .tag{ font-size:11px; font-weight:700; padding:1px 7px; }
+.tag--ok{ background:var(--gruen); color:var(--gruen-dk); }
+.tag--unbekannt{ background:var(--gelb); color:#6b5000; }
+
+.protokoll-zeile{ font-size:13px; padding:8px 0; border-bottom:1px solid var(--linie); }
+.protokoll-zeile b{ font-family:var(--num); }
+</style>
+</head>
+<body>
+
+<div class="anmeldung" id="login-wrap">
+  <div class="anmeldung-karte">
+    <div class="marke">
+      <div class="marke-zeichen">P</div>
+      <div class="marke-txt"><b>Pflegebereich</b><span>Berechnungstool</span></div>
+    </div>
+    <h1>Anmelden</h1>
+    <p class="vor">Zugang für die Verwaltung der Musterberechnung.</p>
+    <div class="feldgruppe"><label for="login-email">E-Mail</label><input class="eingabe" type="email" id="login-email" autocomplete="username"></div>
+    <div class="feldgruppe"><label for="login-pass">Passwort</label><input class="eingabe" type="password" id="login-pass" autocomplete="current-password"></div>
+    <button class="knopf knopf--breit" id="login-btn">Anmelden</button>
+    <div class="fehler" id="login-fehler"></div>
+  </div>
+</div>
+
+<div id="app">
+<div class="rahmen">
+  <div class="seitenleiste">
+    <div class="sl-marke">
+      <div class="marke-zeichen">P</div>
+      <div class="marke-txt"><b>Pflegebereich</b><span>Berechnungstool</span></div>
+    </div>
+    <nav class="sl-nav" id="sl-nav">
+      <button class="sl-item" data-view="projekte">Projekte</button>
+      <button class="sl-item" data-view="preisliste">Preisliste</button>
+      <button class="sl-item" data-view="import">Listen einspielen</button>
+      <button class="sl-item" data-view="einstellungen">Grundeinstellungen</button>
+      <button class="sl-item" data-view="grenzwerte">Grenzwerte</button>
+      <button class="sl-item" data-view="zugaenge">Zugänge</button>
+      <button class="sl-item" data-view="protokoll">Protokoll</button>
+    </nav>
+    <div class="sl-fuss">
+      <div id="sf-email"></div>
+      <button class="knopf knopf--ghost" id="logout-btn" style="color:#fff;border-color:rgba(255,255,255,.4)">Abmelden</button>
+    </div>
+  </div>
+  <div class="inhalt">
+    <div class="kopf">
+      <h1 id="kopf-titel">Projekte</h1>
+      <span class="rolle-badge" id="rolle-badge"></span>
+    </div>
+    <div class="status-zeile" id="status"></div>
+    <div class="seite" id="seite"></div>
+  </div>
+</div>
+</div>
+
+<script>
+(function(){
+  var SUPABASE_URL = 'https://hjujglumumwjmxbmcakf.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_auwdfO8FDX7_MUmk7sBakA_4DWcu-jF';
+  var client = (typeof supabase !== 'undefined') ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+  var MEIN_USER = null;       /* { id, email, rolle } */
+  var VIEW = 'projekte';
+  var PROJEKTE_CACHE = [];
+  var AKTUELLES_PROJEKT_ID = null;
+  var IMPORT_STAND = null;    /* Zwischenstand des Import-Assistenten */
+
+  var BUNDESLAENDER = [
+    'Baden-Württemberg','Bayern','Berlin','Brandenburg','Bremen','Hamburg','Hessen',
+    'Mecklenburg-Vorp.','Niedersachsen','Nordrhein-Westfalen','Rheinland-Pfalz',
+    'Saarland','Sachsen','Sachsen-Anhalt','Schleswig-Holstein','Thüringen'
+  ];
+
+  /* Einheiten-Spalten: nur was fuer die Berechnung noetig ist.
+     Projektbezogene Felder (Bundesland, Baujahr, Wertsteigerung, ...)
+     liegen jetzt auf "projekte" und werden dort gepflegt. */
+  var FELDER = [
+    'id','typ','bezeichnung','lage','zimmer','wohnflaeche_qm',
+    'kaufpreis_einheit','kueche_moebel','stellplatz_kaufpreis','stellplatz_miete_pm',
+    'kaltmiete_je_qm','kaltmiete_pm','bodenanteil_pz','altsubstanz_pz',
+    'sanierungsanteil_pz','neubauanteil_pz',
+    'afa_altsubstanz_pz','hausverwaltung_pm','verfuegbar'
+  ];
+  var TITEL = [
+    'ID','Typ','Einheit','Lage','Zimmer','Wohnfl. m²','Kaufpreis €',
+    'Küche/Möbel €','Stellpl. Kaufpr. €','Stellpl. Miete €','Kaltmiete/m² €',
+    'Kaltmiete p.m. €','Boden %','Altsubst. %','Sanierung %','Neubau %',
+    'AfA Altsubst. %','Hausverw. €','Verfügbar'
+  ];
+  var TEXT_FELDER = { id:1, typ:1, bezeichnung:1, lage:1 };
+
+  function status(text, art){
+    var el = document.getElementById('status');
+    el.textContent = text || '';
+    el.className = 'status-zeile' + (art ? ' ' + art : '');
+  }
+  function escHtml(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+  /* ---------------------------------------------------------------------
+     LOGIN
+     --------------------------------------------------------------------- */
+  document.getElementById('login-btn').addEventListener('click', anmelden);
+  document.getElementById('login-pass').addEventListener('keydown', function(e){ if(e.key === 'Enter') anmelden(); });
+
+  function anmelden(){
+    var email = document.getElementById('login-email').value.trim();
+    var pass = document.getElementById('login-pass').value;
+    var fehlerEl = document.getElementById('login-fehler');
+    fehlerEl.textContent = '';
+    if(!client){ fehlerEl.textContent = 'Supabase konnte nicht geladen werden (kein Internet?).'; return; }
+    if(!email || !pass){ fehlerEl.textContent = 'Bitte E-Mail und Passwort eingeben.'; return; }
+    client.auth.signInWithPassword({ email: email, password: pass }).then(function(res){
+      if(res.error){ fehlerEl.textContent = 'Anmeldung fehlgeschlagen: ' + res.error.message; return; }
+      nachLogin(res.data.session);
+    });
+  }
+
+  document.getElementById('logout-btn').addEventListener('click', function(){
+    client.auth.signOut().then(function(){ location.reload(); });
+  });
+
+  function nachLogin(session){
+    client.from('user_roles').select('rolle').eq('user_id', session.user.id).then(function(res){
+      var rolle = (res.data && res.data[0]) ? res.data[0].rolle : null;
+      if(!rolle){
+        document.getElementById('login-fehler').textContent = 'Dieser Zugang hat noch keine Rolle zugewiesen bekommen. Bitte an die Verwaltung wenden.';
+        client.auth.signOut();
+        return;
+      }
+      MEIN_USER = { id: session.user.id, email: session.user.email, rolle: rolle };
+      document.getElementById('login-wrap').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      document.getElementById('sf-email').textContent = MEIN_USER.email;
+      document.getElementById('rolle-badge').textContent = rolle === 'verwaltung' ? 'Verwaltung' : 'Nur Preislisten';
+      if(rolle !== 'verwaltung'){
+        ['einstellungen','grenzwerte','zugaenge','protokoll'].forEach(function(v){
+          var el = document.querySelector('.sl-item[data-view="' + v + '"]');
+          if(el) el.style.display = 'none';
+        });
+      }
+      geheZu('projekte');
+    });
+  }
+
+  if(client) client.auth.getSession().then(function(res){
+    if(res.data && res.data.session) nachLogin(res.data.session);
+  });
+
+  /* ---------------------------------------------------------------------
+     NAVIGATION / ROUTER
+     --------------------------------------------------------------------- */
+  document.getElementById('sl-nav').addEventListener('click', function(e){
+    var btn = e.target.closest('.sl-item');
+    if(btn) geheZu(btn.dataset.view);
+  });
+
+  var TITEL_JE_VIEW = {
+    projekte: 'Projekte', preisliste: 'Preisliste', import: 'Listen einspielen',
+    einstellungen: 'Grundeinstellungen', grenzwerte: 'Grenzwerte',
+    zugaenge: 'Zugänge', protokoll: 'Protokoll'
+  };
+
+  function geheZu(view){
+    VIEW = view;
+    status('');
+    document.querySelectorAll('.sl-item').forEach(function(el){
+      el.classList.toggle('aktiv', el.dataset.view === view);
+    });
+    document.getElementById('kopf-titel').textContent = TITEL_JE_VIEW[view] || '';
+    var render = { projekte: renderProjekte, preisliste: renderPreisliste, import: renderImport,
+      einstellungen: renderEinstellungen, grenzwerte: renderGrenzwerte,
+      zugaenge: renderZugaenge, protokoll: renderProtokoll }[view];
+    if(render) render();
+  }
+
+  /* ---------------------------------------------------------------------
+     PROJEKTE
+     --------------------------------------------------------------------- */
+  function protokollEintrag(tabelle, aktion, datensatzId, neu){
+    if(!MEIN_USER) return;
+    client.from('protokoll').insert({
+      user_id: MEIN_USER.id, user_email: MEIN_USER.email,
+      tabelle: tabelle, aktion: aktion, datensatz_id: String(datensatzId || ''), neu: neu || null
+    }).then(function(){});
+  }
+
+  function ladeProjekte(callback){
+    client.from('projekte')
+      .select('*, einheiten(id)')
+      .order('name', { ascending: true })
+      .then(function(res){
+        if(res.error){ status('Fehler beim Laden: ' + res.error.message, 'fehler'); return; }
+        PROJEKTE_CACHE = res.data || [];
+        if(callback) callback();
+      });
+  }
+
+  function renderProjekte(){
+    var seite = document.getElementById('seite');
+    seite.innerHTML =
+      '<p class="hinweis">Jedes Projekt gehört zu genau einem Förderprogramm (Denkmal oder QNG) - das entscheidet, in welchem Rechner es später erscheint.</p>' +
+      '<button class="knopf" id="btn-neues-projekt">+ Neues Projekt</button>' +
+      '<div class="karten-grid" id="projekt-karten" style="margin-top:18px"></div>';
+    document.getElementById('btn-neues-projekt').addEventListener('click', function(){ oeffneProjektForm(null); });
+
+    status('Lade Projekte …');
+    ladeProjekte(function(){
+      status(PROJEKTE_CACHE.length + ' Projekte geladen.', 'ok');
+      var grid = document.getElementById('projekt-karten');
+      if(!PROJEKTE_CACHE.length){ grid.innerHTML = '<p class="hinweis">Noch keine Projekte angelegt.</p>'; return; }
+      grid.innerHTML = PROJEKTE_CACHE.map(function(p){
+        var anzahl = (p.einheiten || []).length;
+        return '<div class="projekt-karte">' +
+          '<span class="badge ' + (p.typ === 'QNG' ? 'badge--qng' : 'badge--denkmal') + '">' + escHtml(p.typ) + '</span> ' +
+          '<span class="badge ' + (p.sichtbar ? 'badge--sichtbar' : 'badge--entwurf') + '">' + (p.sichtbar ? 'Sichtbar' : 'Entwurf') + '</span>' +
+          '<h3>' + escHtml(p.name) + '</h3>' +
+          '<div class="zeile">' + escHtml(p.bundesland || '–') + ' · ' + anzahl + ' Einheiten</div>' +
+          '<div class="aktionen">' +
+            '<button class="knopf knopf--ghost" data-bearbeiten="' + p.id + '">Bearbeiten</button>' +
+            '<button class="knopf knopf--ghost" data-preisliste="' + p.id + '">Preisliste</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+      grid.querySelectorAll('[data-bearbeiten]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var p = PROJEKTE_CACHE.filter(function(x){ return String(x.id) === btn.dataset.bearbeiten; })[0];
+          oeffneProjektForm(p);
+        });
+      });
+      grid.querySelectorAll('[data-preisliste]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          AKTUELLES_PROJEKT_ID = Number(btn.dataset.preisliste);
+          geheZu('preisliste');
+        });
+      });
+    });
+  }
+
+  function oeffneProjektForm(projekt){
+    var neu = !projekt;
+    var bl = projekt ? projekt.bundesland : '';
+    var hg = document.createElement('div');
+    hg.className = 'modal-hg';
+    hg.innerHTML =
+      '<div class="modal">' +
+        '<h2>' + (neu ? 'Neues Projekt' : 'Projekt bearbeiten') + '</h2>' +
+        '<div class="form-grid">' +
+          '<div class="voll"><label>Projektname *</label><input class="eingabe" id="pf-name" value="' + escHtml(projekt ? projekt.name : '') + '"></div>' +
+          '<div><label>Typ *</label><select class="eingabe" id="pf-typ">' +
+            '<option value="Denkmal"' + (projekt && projekt.typ === 'Denkmal' ? ' selected' : '') + '>Denkmal</option>' +
+            '<option value="QNG"' + (projekt && projekt.typ === 'QNG' ? ' selected' : '') + '>QNG</option>' +
+          '</select></div>' +
+          '<div><label>Bundesland</label><select class="eingabe" id="pf-bundesland">' +
+            '<option value="">–</option>' +
+            BUNDESLAENDER.map(function(b){ return '<option' + (b === bl ? ' selected' : '') + '>' + b + '</option>'; }).join('') +
+          '</select></div>' +
+          '<div id="pf-baujahrsklasse-wrap"><label>Baujahrsklasse</label><select class="eingabe" id="pf-baujahrsklasse">' +
+            '<option value="">–</option>' +
+            ['vor 1925','ab 1925','Neubau'].map(function(b){ return '<option' + (projekt && projekt.baujahrsklasse === b ? ' selected' : '') + '>' + b + '</option>'; }).join('') +
+          '</select></div>' +
+          '<div><label>Baujahr</label><input class="eingabe" id="pf-baujahr" type="number" value="' + (projekt && projekt.baujahr != null ? projekt.baujahr : '') + '"></div>' +
+          '<div><label>Wertsteigerung p.a. %</label><input class="eingabe" id="pf-wertsteigerung" type="number" step="0.1" value="' + (projekt && projekt.wertsteigerung_pa_pz != null ? projekt.wertsteigerung_pa_pz : '') + '"></div>' +
+          '<div><label>Mietsteigerung p.a. %</label><input class="eingabe" id="pf-mietsteigerung" type="number" step="0.1" value="' + (projekt && projekt.mietsteigerung_pa_pz != null ? projekt.mietsteigerung_pa_pz : '') + '"></div>' +
+          '<div><label>Fertigstellung</label><input class="eingabe" id="pf-fertigstellung" type="date" value="' + (projekt && projekt.fertigstellung ? projekt.fertigstellung : '') + '"></div>' +
+          '<div><label>Status</label><select class="eingabe" id="pf-sichtbar">' +
+            '<option value="true"' + (!projekt || projekt.sichtbar ? ' selected' : '') + '>Sichtbar</option>' +
+            '<option value="false"' + (projekt && !projekt.sichtbar ? ' selected' : '') + '>Entwurf</option>' +
+          '</select></div>' +
+        '</div>' +
+        '<div class="fehler" id="pf-fehler"></div>' +
+        '<div class="modal-aktionen">' +
+          '<button class="knopf" id="pf-speichern">Speichern</button>' +
+          '<button class="knopf knopf--ghost" id="pf-abbrechen">Abbrechen</button>' +
+          (neu ? '' : '<button class="knopf knopf--gefahr" id="pf-loeschen" style="margin-left:auto">Projekt löschen</button>') +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(hg);
+
+    document.getElementById('pf-abbrechen').addEventListener('click', function(){ hg.remove(); });
+    hg.addEventListener('click', function(e){ if(e.target === hg) hg.remove(); });
+
+    document.getElementById('pf-speichern').addEventListener('click', function(){
+      var daten = {
+        name: document.getElementById('pf-name').value.trim(),
+        typ: document.getElementById('pf-typ').value,
+        bundesland: document.getElementById('pf-bundesland').value || null,
+        baujahrsklasse: document.getElementById('pf-baujahrsklasse').value || null,
+        baujahr: document.getElementById('pf-baujahr').value ? Number(document.getElementById('pf-baujahr').value) : null,
+        wertsteigerung_pa_pz: document.getElementById('pf-wertsteigerung').value ? Number(document.getElementById('pf-wertsteigerung').value) : null,
+        mietsteigerung_pa_pz: document.getElementById('pf-mietsteigerung').value ? Number(document.getElementById('pf-mietsteigerung').value) : null,
+        fertigstellung: document.getElementById('pf-fertigstellung').value || null,
+        sichtbar: document.getElementById('pf-sichtbar').value === 'true'
+      };
+      var fehlerEl = document.getElementById('pf-fehler');
+      if(!daten.name){ fehlerEl.textContent = 'Bitte einen Projektnamen eingeben.'; return; }
+      if(!daten.typ){ fehlerEl.textContent = 'Bitte Denkmal oder QNG auswählen.'; return; }
+
+      var aufgabe = neu ? client.from('projekte').insert(daten).select()
+                        : client.from('projekte').update(daten).eq('id', projekt.id).select();
+      aufgabe.then(function(res){
+        if(res.error){ fehlerEl.textContent = 'Fehler: ' + res.error.message; return; }
+        hg.remove();
+        status(neu ? 'Projekt angelegt.' : 'Projekt aktualisiert.', 'ok');
+        renderProjekte();
+      });
+    });
+
+    var loeschBtn = document.getElementById('pf-loeschen');
+    if(loeschBtn) loeschBtn.addEventListener('click', function(){
+      if(!confirm('Projekt "' + projekt.name + '" wirklich löschen? Das geht nur, wenn keine Einheiten mehr zugeordnet sind.')) return;
+      client.from('projekte').delete().eq('id', projekt.id).then(function(res){
+        if(res.error){ document.getElementById('pf-fehler').textContent = 'Fehler: ' + res.error.message; return; }
+        hg.remove();
+        status('Projekt gelöscht.', 'ok');
+        renderProjekte();
+      });
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+     PREISLISTE (pro Projekt)
+     --------------------------------------------------------------------- */
+  function renderPreisliste(){
+    var seite = document.getElementById('seite');
+    if(!PROJEKTE_CACHE.length){
+      seite.innerHTML = '<p class="hinweis">Bitte zuerst unter "Projekte" ein Projekt anlegen.</p>';
+      ladeProjekte(renderPreisliste);
+      return;
+    }
+    if(!AKTUELLES_PROJEKT_ID) AKTUELLES_PROJEKT_ID = PROJEKTE_CACHE[0].id;
+
+    seite.innerHTML =
+      '<div class="feldgruppe" style="max-width:360px"><label>Projekt</label>' +
+      '<select class="eingabe" id="pl-projekt-wahl">' +
+        PROJEKTE_CACHE.map(function(p){ return '<option value="' + p.id + '"' + (p.id === AKTUELLES_PROJEKT_ID ? ' selected' : '') + '>' + escHtml(p.name) + ' (' + p.typ + ')</option>'; }).join('') +
+      '</select></div>' +
+      '<p class="hinweis">Erste Zeile (Überschriften) beim Bearbeiten bitte unverändert lassen. Spalte <b>ID</b> steuert, welcher Datensatz aktualisiert wird: leer lassen bei neuen Zeilen, Zeile komplett entfernen zum Löschen.</p>' +
+      '<button class="knopf" id="pl-download">⬇ Preisliste dieses Projekts herunterladen</button>' +
+      '<div style="margin-top:16px"><label style="font-size:12px;font-weight:600;text-transform:uppercase;color:var(--txt-leise)">Bearbeitete Datei hochladen</label><br>' +
+      '<input type="file" id="pl-datei" accept=".xlsx,.xls" style="margin-top:6px"></div>' +
+      '<div id="pl-vorschau" style="display:none;margin-top:16px;background:#fff;border:1px solid var(--linie);padding:16px 18px;max-width:520px">' +
+        '<h3 style="margin-top:0;font-size:14px">Vorschau</h3>' +
+        '<div id="pl-vorschau-text"></div>' +
+        '<button class="knopf" id="pl-uebernehmen" style="background:var(--gruen-dk);border-color:var(--gruen-dk)">✓ Übernehmen</button> ' +
+        '<button class="knopf knopf--ghost" id="pl-abbrechen">Abbrechen</button>' +
+      '</div>';
+
+    document.getElementById('pl-projekt-wahl').addEventListener('change', function(e){
+      AKTUELLES_PROJEKT_ID = Number(e.target.value);
+      renderPreisliste();
+    });
+    document.getElementById('pl-download').addEventListener('click', preislisteHerunterladen);
+    document.getElementById('pl-datei').addEventListener('change', function(e){
+      var datei = e.target.files[0];
+      if(!datei) return;
+      var reader = new FileReader();
+      reader.onload = function(ev){ try{ preisdateiVerarbeiten(ev.target.result); } catch(err){ status('Datei konnte nicht gelesen werden: ' + err.message, 'fehler'); } };
+      reader.readAsArrayBuffer(datei);
+    });
+  }
+
+  function preislisteHerunterladen(){
+    status('Lade Daten …');
+    client.from('einheiten').select('*').eq('projekt_id', AKTUELLES_PROJEKT_ID).order('id', { ascending: true }).then(function(res){
+      if(res.error){ status('Fehler: ' + res.error.message, 'fehler'); return; }
+      var rows = res.data || [];
+      var aoa = [TITEL];
+      rows.forEach(function(r){
+        aoa.push(FELDER.map(function(f){
+          var v = r[f];
+          if(v == null) return '';
+          if(f === 'verfuegbar') return v ? 'ja' : '';
+          return v;
+        }));
+      });
+      var ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = TITEL.map(function(){ return { wch: 15 }; });
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Preisliste');
+      var projekt = PROJEKTE_CACHE.filter(function(p){ return p.id === AKTUELLES_PROJEKT_ID; })[0];
+      var dateiname = (projekt ? projekt.name.replace(/[^a-z0-9]+/gi, '_') : 'preisliste') + '_' + new Date().toISOString().slice(0,10) + '.xlsx';
+      XLSX.writeFile(wb, dateiname);
+      status(rows.length + ' Zeilen heruntergeladen.', 'ok');
+    });
+  }
+
+  function zuZahl(wert){
+    if(wert === null || wert === undefined || wert === '') return null;
+    if(typeof wert === 'number') return wert;
+    var s = String(wert).trim();
+    if(s === '') return null;
+    if(s.indexOf(',') !== -1) s = s.replace(/\./g, '').replace(',', '.');
+    var n = Number(s);
+    return isNaN(n) ? null : n;
+  }
+  function zuBool(wert){
+    if(wert === null || wert === undefined || wert === '') return null;
+    return /^(1|ja|true|wahr|x)$/i.test(String(wert).trim()) ? true : null;
+  }
+
+  var AUSSTEHENDE_AENDERUNG = null;
+
+  function preisdateiVerarbeiten(arrayBuffer){
+    var wb = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+    var ws = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+    if(!rows.length){ status('Die Datei enthält keine Daten.', 'fehler'); return; }
+    var kopf = rows[0].map(function(h){ return String(h || '').trim(); });
+
+    var spaltenIndex = {};
+    FELDER.forEach(function(feld, i){
+      var titel = TITEL[i];
+      var idx = kopf.indexOf(titel);
+      if(idx === -1) idx = kopf.findIndex(function(h){ return h.toLowerCase() === titel.toLowerCase(); });
+      spaltenIndex[feld] = idx;
+    });
+    if(spaltenIndex.bezeichnung === -1){
+      status('Überschriften nicht erkannt – bitte die erste Zeile nicht verändern.', 'fehler');
+      return;
+    }
+
+    var datenZeilen = rows.slice(1).filter(function(z){ return z.some(function(v){ return String(v || '').trim() !== ''; }); });
+    var objekte = datenZeilen.map(function(z){
+      var o = { projekt_id: AKTUELLES_PROJEKT_ID };
+      FELDER.forEach(function(feld){
+        var idx = spaltenIndex[feld];
+        var wert = idx === -1 ? '' : z[idx];
+        if(wert === undefined) wert = '';
+        if(feld === 'verfuegbar') o[feld] = zuBool(wert);
+        else if(TEXT_FELDER[feld]) o[feld] = (wert === '' ? null : String(wert).trim());
+        else o[feld] = zuZahl(wert);
+      });
+      return o;
+    }).filter(function(o){ return o.bezeichnung; });
+
+    status('Vergleiche mit Datenbank …');
+    client.from('einheiten').select('id').eq('projekt_id', AKTUELLES_PROJEKT_ID).then(function(res){
+      if(res.error){ status('Fehler beim Abgleich: ' + res.error.message, 'fehler'); return; }
+      var idsAktuell = (res.data || []).map(function(r){ return String(r.id); });
+      var bestehende = objekte.filter(function(o){ return o.id != null; }).map(function(o){ return Object.assign({}, o, { id: Number(o.id) }); });
+      var neue = objekte.filter(function(o){ return o.id == null; }).map(function(o){ var k = Object.assign({}, o); delete k.id; return k; });
+      var idsInDatei = bestehende.map(function(o){ return String(o.id); });
+      var geloeschteIds = idsAktuell.filter(function(id){ return idsInDatei.indexOf(id) === -1; }).map(Number);
+
+      AUSSTEHENDE_AENDERUNG = { bestehende: bestehende, neue: neue, geloeschteIds: geloeschteIds };
+      document.getElementById('pl-vorschau-text').innerHTML =
+        '<ul style="margin:0 0 12px;padding-left:20px">' +
+          '<li><b>' + bestehende.length + '</b> Zeilen werden aktualisiert</li>' +
+          '<li><b>' + neue.length + '</b> neue Zeilen werden angelegt</li>' +
+          '<li><b>' + geloeschteIds.length + '</b> Zeilen werden gelöscht</li>' +
+        '</ul>';
+      document.getElementById('pl-vorschau').style.display = 'block';
+      document.getElementById('pl-uebernehmen').onclick = preislisteUebernehmen;
+      document.getElementById('pl-abbrechen').onclick = function(){
+        AUSSTEHENDE_AENDERUNG = null;
+        document.getElementById('pl-vorschau').style.display = 'none';
+        document.getElementById('pl-datei').value = '';
+      };
+      status('');
+    });
+  }
+
+  function preislisteUebernehmen(){
+    if(!AUSSTEHENDE_AENDERUNG) return;
+    var a = AUSSTEHENDE_AENDERUNG;
+    if(a.geloeschteIds.length && !confirm(a.geloeschteIds.length + ' Zeile(n) werden gelöscht. Fortfahren?')) return;
+
+    status('Übernehme Änderungen …');
+    var aufgaben = [];
+    if(a.bestehende.length) aufgaben.push(client.from('einheiten').upsert(a.bestehende));
+    if(a.neue.length) aufgaben.push(client.from('einheiten').insert(a.neue));
+    if(a.geloeschteIds.length) aufgaben.push(client.from('einheiten').delete().in('id', a.geloeschteIds));
+
+    Promise.all(aufgaben).then(function(ergebnisse){
+      var fehler = ergebnisse.filter(function(r){ return r.error; });
+      if(fehler.length){ status('Fehler: ' + fehler.map(function(f){ return f.error.message; }).join(' | '), 'fehler'); return; }
+      var projekt = PROJEKTE_CACHE.filter(function(p){ return p.id === AKTUELLES_PROJEKT_ID; })[0];
+      protokollEintrag('einheiten', 'update', AKTUELLES_PROJEKT_ID, {
+        projekt: projekt ? projekt.name : AKTUELLES_PROJEKT_ID,
+        aktualisiert: a.bestehende.length, neu: a.neue.length, geloescht: a.geloeschteIds.length
+      });
+      status('Übernommen: ' + a.bestehende.length + ' aktualisiert, ' + a.neue.length + ' neu, ' + a.geloeschteIds.length + ' gelöscht.', 'ok');
+      AUSSTEHENDE_AENDERUNG = null;
+      document.getElementById('pl-vorschau').style.display = 'none';
+      document.getElementById('pl-datei').value = '';
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+     LISTEN EINSPIELEN (Import mit Spalten-Pruefung)
+     --------------------------------------------------------------------- */
+  function renderImport(){
+    if(!PROJEKTE_CACHE.length){ ladeProjekte(renderImport); return; }
+    IMPORT_STAND = { schritt: 1, projektId: PROJEKTE_CACHE[0].id, datei: null, kopf: null, zeilen: null, erkannt: null, unbekannt: null };
+    renderImportSchritt();
+  }
+
+  function importSchrittLeiste(aktiv){
+    var namen = ['Datei wählen', 'Spalten prüfen', 'Vorschau', 'Übernommen'];
+    return '<div class="schritt-leiste">' + namen.map(function(n, i){
+      var nr = i + 1;
+      var cls = nr === aktiv ? 'aktiv' : (nr < aktiv ? 'fertig' : '');
+      return '<div class="s ' + cls + '">' + nr + '. ' + n + '</div>';
+    }).join('') + '</div>';
+  }
+
+  function renderImportSchritt(){
+    var seite = document.getElementById('seite');
+    var st = IMPORT_STAND;
+
+    if(st.schritt === 1){
+      seite.innerHTML = importSchrittLeiste(1) +
+        '<div class="feldgruppe" style="max-width:360px"><label>Zielprojekt</label>' +
+        '<select class="eingabe" id="im-projekt">' +
+          PROJEKTE_CACHE.map(function(p){ return '<option value="' + p.id + '">' + escHtml(p.name) + ' (' + p.typ + ')</option>'; }).join('') +
+        '</select></div>' +
+        '<p class="hinweis">Datei aus einer beliebigen Quelle (auch mit abweichenden Spaltennamen) - im nächsten Schritt zeige ich, welche Spalten erkannt wurden.</p>' +
+        '<input type="file" id="im-datei" accept=".xlsx,.xls">';
+      document.getElementById('im-datei').addEventListener('change', function(e){
+        var datei = e.target.files[0];
+        if(!datei) return;
+        st.projektId = Number(document.getElementById('im-projekt').value);
+        var reader = new FileReader();
+        reader.onload = function(ev){
+          try{ importDateiLesen(ev.target.result); } catch(err){ status('Datei konnte nicht gelesen werden: ' + err.message, 'fehler'); }
+        };
+        reader.readAsArrayBuffer(datei);
+      });
+      return;
+    }
+
+    if(st.schritt === 2){
+      var zeilenHtml = st.erkannt.map(function(f){
+        return '<div class="spalten-zeile"><span class="tag tag--ok">erkannt</span> "' + escHtml(f.spalte) + '" → ' + escHtml(f.bezeichnung) + '</div>';
+      }).join('') + st.unbekannt.map(function(u){
+        return '<div class="spalten-zeile unbekannt"><span class="tag tag--unbekannt">unbekannt</span> "' + escHtml(u) + '" - wird nicht übernommen</div>';
+      }).join('');
+      seite.innerHTML = importSchrittLeiste(2) +
+        '<p class="hinweis">Nur Spalten, die für die Berechnung gebraucht werden, werden übernommen. Unbekannte Spalten werden hier nur zur Kontrolle angezeigt, aber nicht gespeichert.</p>' +
+        '<div class="spalten-liste">' + zeilenHtml + '</div>' +
+        '<button class="knopf" id="im-weiter">Weiter zur Vorschau</button> ' +
+        '<button class="knopf knopf--ghost" id="im-zurueck">Zurück</button>';
+      document.getElementById('im-weiter').addEventListener('click', function(){ importVorschauBerechnen(); });
+      document.getElementById('im-zurueck').addEventListener('click', function(){ st.schritt = 1; renderImportSchritt(); });
+      return;
+    }
+
+    if(st.schritt === 3){
+      seite.innerHTML = importSchrittLeiste(3) +
+        '<div id="im-vorschau-text"></div>' +
+        '<button class="knopf" id="im-uebernehmen" style="background:var(--gruen-dk);border-color:var(--gruen-dk)">✓ Übernehmen</button> ' +
+        '<button class="knopf knopf--ghost" id="im-zurueck2">Zurück</button>';
+      document.getElementById('im-vorschau-text').innerHTML =
+        '<ul style="margin:0 0 12px;padding-left:20px">' +
+          '<li><b>' + st.diff.bestehende.length + '</b> Zeilen werden aktualisiert</li>' +
+          '<li><b>' + st.diff.neue.length + '</b> neue Zeilen werden angelegt</li>' +
+          '<li><b>' + st.diff.geloeschteIds.length + '</b> Zeilen werden gelöscht</li>' +
+        '</ul>';
+      document.getElementById('im-uebernehmen').addEventListener('click', importUebernehmen);
+      document.getElementById('im-zurueck2').addEventListener('click', function(){ st.schritt = 2; renderImportSchritt(); });
+      return;
+    }
+
+    if(st.schritt === 4){
+      seite.innerHTML = importSchrittLeiste(4) +
+        '<p style="color:var(--gruen-dk);font-weight:600">Import abgeschlossen.</p>' +
+        '<button class="knopf knopf--ghost" id="im-neu">Weitere Datei einspielen</button>';
+      document.getElementById('im-neu').addEventListener('click', renderImport);
+      return;
+    }
+  }
+
+  function importDateiLesen(arrayBuffer){
+    var st = IMPORT_STAND;
+    var wb = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+    var ws = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+    if(!rows.length){ status('Die Datei enthält keine Daten.', 'fehler'); return; }
+    var kopf = rows[0].map(function(h){ return String(h || '').trim(); });
+
+    var erkannt = [], spaltenIndex = {};
+    FELDER.forEach(function(feld, i){
+      var titel = TITEL[i];
+      var idx = kopf.findIndex(function(h){ return h.toLowerCase() === titel.toLowerCase(); });
+      if(idx !== -1){ spaltenIndex[feld] = idx; erkannt.push({ spalte: kopf[idx], bezeichnung: titel }); }
+    });
+    var erkannteIdx = erkannt.map(function(){ return true; });
+    var unbekannt = kopf.filter(function(h, i){
+      return h !== '' && Object.keys(spaltenIndex).every(function(f){ return spaltenIndex[f] !== i; });
+    });
+
+    st.kopf = kopf; st.zeilen = rows.slice(1); st.spaltenIndex = spaltenIndex;
+    st.erkannt = erkannt; st.unbekannt = unbekannt;
+    st.schritt = 2;
+    renderImportSchritt();
+  }
+
+  function importVorschauBerechnen(){
+    var st = IMPORT_STAND;
+    var datenZeilen = st.zeilen.filter(function(z){ return z.some(function(v){ return String(v || '').trim() !== ''; }); });
+    var objekte = datenZeilen.map(function(z){
+      var o = { projekt_id: st.projektId };
+      FELDER.forEach(function(feld){
+        var idx = st.spaltenIndex[feld];
+        var wert = (idx === undefined || idx === -1) ? '' : z[idx];
+        if(wert === undefined) wert = '';
+        if(feld === 'verfuegbar') o[feld] = zuBool(wert);
+        else if(TEXT_FELDER[feld]) o[feld] = (wert === '' ? null : String(wert).trim());
+        else o[feld] = zuZahl(wert);
+      });
+      return o;
+    }).filter(function(o){ return o.bezeichnung; });
+
+    status('Vergleiche mit Datenbank …');
+    client.from('einheiten').select('id').eq('projekt_id', st.projektId).then(function(res){
+      if(res.error){ status('Fehler beim Abgleich: ' + res.error.message, 'fehler'); return; }
+      var idsAktuell = (res.data || []).map(function(r){ return String(r.id); });
+      var bestehende = objekte.filter(function(o){ return o.id != null; }).map(function(o){ return Object.assign({}, o, { id: Number(o.id) }); });
+      var neue = objekte.filter(function(o){ return o.id == null; }).map(function(o){ var k = Object.assign({}, o); delete k.id; return k; });
+      var idsInDatei = bestehende.map(function(o){ return String(o.id); });
+      var geloeschteIds = idsAktuell.filter(function(id){ return idsInDatei.indexOf(id) === -1; }).map(Number);
+      st.diff = { bestehende: bestehende, neue: neue, geloeschteIds: geloeschteIds };
+      st.schritt = 3;
+      status('');
+      renderImportSchritt();
+    });
+  }
+
+  function importUebernehmen(){
+    var st = IMPORT_STAND, a = st.diff;
+    if(a.geloeschteIds.length && !confirm(a.geloeschteIds.length + ' Zeile(n) werden gelöscht. Fortfahren?')) return;
+    status('Übernehme Änderungen …');
+    var aufgaben = [];
+    if(a.bestehende.length) aufgaben.push(client.from('einheiten').upsert(a.bestehende));
+    if(a.neue.length) aufgaben.push(client.from('einheiten').insert(a.neue));
+    if(a.geloeschteIds.length) aufgaben.push(client.from('einheiten').delete().in('id', a.geloeschteIds));
+    Promise.all(aufgaben).then(function(ergebnisse){
+      var fehler = ergebnisse.filter(function(r){ return r.error; });
+      if(fehler.length){ status('Fehler: ' + fehler.map(function(f){ return f.error.message; }).join(' | '), 'fehler'); return; }
+      var projekt = PROJEKTE_CACHE.filter(function(p){ return p.id === st.projektId; })[0];
+      protokollEintrag('einheiten', 'update', st.projektId, {
+        projekt: projekt ? projekt.name : st.projektId, quelle: 'Import-Assistent',
+        aktualisiert: a.bestehende.length, neu: a.neue.length, geloescht: a.geloeschteIds.length
+      });
+      status('Import abgeschlossen.', 'ok');
+      st.schritt = 4;
+      renderImportSchritt();
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+     GRUNDEINSTELLUNGEN
+     --------------------------------------------------------------------- */
+  function renderEinstellungen(){
+    var seite = document.getElementById('seite');
+    seite.innerHTML = '<p class="hinweis">Standardwerte, mit denen der Rechner startet.</p><div id="es-liste"></div>';
+    status('Lade …');
+    client.from('einstellungen').select('*').order('bezeichnung').then(function(res){
+      if(res.error){ status('Fehler: ' + res.error.message, 'fehler'); return; }
+      status('');
+      var rows = res.data || [];
+      document.getElementById('es-liste').innerHTML =
+        '<div class="form-grid">' + rows.map(function(r){
+          return '<div><label>' + escHtml(r.bezeichnung) + '</label>' +
+            '<input class="eingabe" data-schluessel="' + escHtml(r.schluessel) + '" value="' + escHtml(r.wert) + '"></div>';
+        }).join('') + '</div>' +
+        '<button class="knopf" id="es-speichern" style="margin-top:18px">Speichern</button>';
+      document.getElementById('es-speichern').addEventListener('click', function(){
+        var eingaben = document.querySelectorAll('#es-liste input[data-schluessel]');
+        var aufgaben = Array.prototype.map.call(eingaben, function(inp){
+          return client.from('einstellungen').update({ wert: inp.value }).eq('schluessel', inp.dataset.schluessel);
+        });
+        status('Speichere …');
+        Promise.all(aufgaben).then(function(erg){
+          var fehler = erg.filter(function(r){ return r.error; });
+          status(fehler.length ? 'Fehler beim Speichern.' : 'Gespeichert.', fehler.length ? 'fehler' : 'ok');
+        });
+      });
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+     GRENZWERTE
+     --------------------------------------------------------------------- */
+  function renderGrenzwerte(){
+    var seite = document.getElementById('seite');
+    seite.innerHTML = '<p class="hinweis">"Hinweis" zeigt dem Nutzer nur eine Warnung, "Hart" verhindert Werte außerhalb der Grenze.</p><div id="gw-tabelle"></div><button class="knopf" id="gw-speichern" style="margin-top:14px">Speichern</button>';
+    status('Lade …');
+    client.from('grenzwerte').select('*').order('bezeichnung').then(function(res){
+      if(res.error){ status('Fehler: ' + res.error.message, 'fehler'); return; }
+      status('');
+      var rows = res.data || [];
+      document.getElementById('gw-tabelle').innerHTML =
+        '<table class="tbl"><thead><tr><th>Feld</th><th>Minimum</th><th>Standard</th><th>Maximum</th><th>Verhalten</th></tr></thead><tbody>' +
+        rows.map(function(r){
+          return '<tr data-feld="' + escHtml(r.feld) + '">' +
+            '<td>' + escHtml(r.bezeichnung) + '</td>' +
+            '<td><input value="' + (r.min_wert != null ? r.min_wert : '') + '" data-k="min_wert"></td>' +
+            '<td><input value="' + (r.standard_wert != null ? r.standard_wert : '') + '" data-k="standard_wert"></td>' +
+            '<td><input value="' + (r.max_wert != null ? r.max_wert : '') + '" data-k="max_wert"></td>' +
+            '<td><select data-k="verhalten"><option value="hinweis"' + (r.verhalten === 'hinweis' ? ' selected' : '') + '>Hinweis</option><option value="hart"' + (r.verhalten === 'hart' ? ' selected' : '') + '>Hart</option></select></td>' +
+          '</tr>';
+        }).join('') + '</tbody></table>';
+      document.getElementById('gw-speichern').addEventListener('click', function(){
+        var zeilen = document.querySelectorAll('#gw-tabelle tr[data-feld]');
+        var aufgaben = Array.prototype.map.call(zeilen, function(tr){
+          var patch = {};
+          tr.querySelectorAll('[data-k]').forEach(function(el){
+            var k = el.dataset.k;
+            patch[k] = (k === 'verhalten') ? el.value : (el.value === '' ? null : Number(el.value));
+          });
+          return client.from('grenzwerte').update(patch).eq('feld', tr.dataset.feld);
+        });
+        status('Speichere …');
+        Promise.all(aufgaben).then(function(erg){
+          var fehler = erg.filter(function(r){ return r.error; });
+          status(fehler.length ? 'Fehler beim Speichern.' : 'Gespeichert.', fehler.length ? 'fehler' : 'ok');
+        });
+      });
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+     ZUGAENGE (Rollen)
+     --------------------------------------------------------------------- */
+  function renderZugaenge(){
+    var seite = document.getElementById('seite');
+    seite.innerHTML =
+      '<p class="hinweis"><b>Verwaltung</b>: voller Zugriff, inkl. Grenzwerte und Zugänge. <b>Nur Preislisten</b>: darf ausschließlich Projekte und Preislisten pflegen.</p>' +
+      '<p class="hinweis">Neue Person anlegen geht aktuell noch nicht direkt hier (dafür bräuchte es einen zusätzlichen Baustein) - bitte wie gehabt über die Supabase-Oberfläche anlegen, danach hier die Rolle zuweisen.</p>' +
+      '<div id="zg-tabelle"></div>';
+    status('Lade …');
+    client.from('user_roles').select('user_id, rolle, profiles(email)').then(function(res){
+      if(res.error){ status('Fehler: ' + res.error.message, 'fehler'); return; }
+      status('');
+      var rows = res.data || [];
+      document.getElementById('zg-tabelle').innerHTML =
+        '<table class="tbl"><thead><tr><th>E-Mail</th><th>Rolle</th><th></th></tr></thead><tbody>' +
+        rows.map(function(r){
+          var email = r.profiles ? r.profiles.email : r.user_id;
+          return '<tr data-user="' + r.user_id + '">' +
+            '<td>' + escHtml(email) + '</td>' +
+            '<td><select data-k="rolle"><option value="verwaltung"' + (r.rolle === 'verwaltung' ? ' selected' : '') + '>Verwaltung</option><option value="preislisten"' + (r.rolle === 'preislisten' ? ' selected' : '') + '>Nur Preislisten</option></select></td>' +
+            '<td><button class="knopf knopf--ghost" data-speichern>Speichern</button></td>' +
+          '</tr>';
+        }).join('') + '</tbody></table>';
+      document.querySelectorAll('#zg-tabelle [data-speichern]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var tr = btn.closest('tr');
+          var rolle = tr.querySelector('[data-k="rolle"]').value;
+          client.from('user_roles').update({ rolle: rolle }).eq('user_id', tr.dataset.user).then(function(res2){
+            if(res2.error){ status('Fehler: ' + res2.error.message, 'fehler'); return; }
+            status('Rolle aktualisiert.', 'ok');
+          });
+        });
+      });
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+     PROTOKOLL
+     --------------------------------------------------------------------- */
+  function renderProtokoll(){
+    var seite = document.getElementById('seite');
+    seite.innerHTML = '<div id="pr-liste"></div>';
+    status('Lade …');
+    client.from('protokoll').select('*').order('zeitpunkt', { ascending: false }).limit(100).then(function(res){
+      if(res.error){ status('Fehler: ' + res.error.message, 'fehler'); return; }
+      status('');
+      var rows = res.data || [];
+      if(!rows.length){ document.getElementById('pr-liste').innerHTML = '<p class="hinweis">Noch keine Einträge.</p>'; return; }
+      document.getElementById('pr-liste').innerHTML = rows.map(function(r){
+        var zeit = new Date(r.zeitpunkt).toLocaleString('de-DE');
+        var details = r.neu ? Object.keys(r.neu).map(function(k){ return k + ': ' + r.neu[k]; }).join(', ') : '';
+        return '<div class="protokoll-zeile"><b>' + zeit + '</b> · ' + escHtml(r.user_email || '–') + ' · ' + escHtml(r.tabelle) + ' (' + escHtml(r.aktion) + ')' +
+          (details ? '<br><span style="color:var(--txt-leise)">' + escHtml(details) + '</span>' : '') + '</div>';
+      }).join('');
+    });
+  }
+
+})();
+</script>
+</body>
+</html>
