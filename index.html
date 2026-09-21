@@ -2970,23 +2970,39 @@ var IB_ZAEHLDAUER = 550;
    ========================================================================= */
 (function(){
 
+  /* Fallback (2026), falls die Datenbank nicht erreichbar ist - wird bei
+     Verbindung sofort durch den aktuellsten Datenbank-Stand ersetzt
+     (siehe ibSteuerparameterLaden weiter unten). */
+  window.IB_STEUERPARAMETER = {
+    steuerjahr: 2026,
+    grenze_1: 12348, grenze_2: 17799, grenze_3: 69878, grenze_4: 277825,
+    zone2_faktor: 914.51, zone2_offset: 1400,
+    zone3_faktor: 173.1, zone3_offset: 2397, zone3_konstante: 1034.87,
+    zone4_satz: 0.42, zone4_abzug: 11135.63,
+    zone5_satz: 0.45, zone5_abzug: 19470.38,
+    soli_freigrenze_grund: 20350, soli_freigrenze_splitting: 40700,
+    soli_satz: 0.055, soli_milderungssatz: 0.119
+  };
+
   function berechneESt(zve, isSplitting){
     if(zve <= 0) return 0;
+    var p = window.IB_STEUERPARAMETER;
     var a = isSplitting ? zve / 2 : zve;
     var est = 0;
-    if(a <= 12348) est = 0;
-    else if(a <= 17799){ var y = (a - 12348) / 10000; est = (914.51 * y + 1400) * y; }
-    else if(a <= 69878){ var z = (a - 17799) / 10000; est = (173.1 * z + 2397) * z + 1034.87; }
-    else if(a <= 277825) est = 0.42 * a - 11135.63;
-    else est = 0.45 * a - 19470.38;
+    if(a <= p.grenze_1) est = 0;
+    else if(a <= p.grenze_2){ var y = (a - p.grenze_1) / 10000; est = (p.zone2_faktor * y + p.zone2_offset) * y; }
+    else if(a <= p.grenze_3){ var z = (a - p.grenze_2) / 10000; est = (p.zone3_faktor * z + p.zone3_offset) * z + p.zone3_konstante; }
+    else if(a <= p.grenze_4) est = p.zone4_satz * a - p.zone4_abzug;
+    else est = p.zone5_satz * a - p.zone5_abzug;
     return isSplitting ? est * 2 : est;
   }
 
   function berechneSoli(est, isSplitting){
     if(est <= 0) return 0;
-    var freigrenze = isSplitting ? 40700 : 20350; /* aktuelle Freigrenze seit 2024, Admin!O27/P27 */
+    var p = window.IB_STEUERPARAMETER;
+    var freigrenze = isSplitting ? p.soli_freigrenze_splitting : p.soli_freigrenze_grund;
     if(est <= freigrenze) return 0;
-    return Math.min((est - freigrenze) * 0.119, est * 0.055);
+    return Math.min((est - freigrenze) * p.soli_milderungssatz, est * p.soli_satz);
   }
 
   function resolveStellplatzMoebel(inputs){
@@ -3806,6 +3822,19 @@ window.ibBerechnen(true);
 
 /* Danach: Projekt-/Einheitenliste aus Supabase nachladen. */
 if(window.ibSupabaseLaden) window.ibSupabaseLaden();
+
+/* Aktuellste Einkommensteuer-Parameter aus der Datenbank nachladen
+   (Admin kann sie jaehrlich aktualisieren, ohne den Rechner-Code
+   anzufassen). Bei Fehler/ohne Internet bleibt der eingebaute
+   2026er-Fallback von oben aktiv. */
+if(IB_SUPABASE_CLIENT){
+  IB_SUPABASE_CLIENT.from('steuerparameter').select('*').order('steuerjahr', { ascending: false }).limit(1)
+    .then(function(res){
+      if(res.error || !res.data || !res.data.length) return;
+      window.IB_STEUERPARAMETER = res.data[0];
+      if(window.ibBerechnen) window.ibBerechnen(true);
+    });
+}
 
 </script>
 
