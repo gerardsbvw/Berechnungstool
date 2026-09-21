@@ -533,7 +533,7 @@ a.ib-btn{ text-decoration: none; }   /* Rueckkehr-Knopf ist ein Link */
   background: #fff;
 }
 /* Feld, dessen Wert gerade hochzaehlt */
-.ib-laeuft{ color: var(--ib-blue-dk); }
+.ib-laeuft{ /* bewusst ohne Farbe/Hintergrund - nur das Hochzaehlen selbst ist der Effekt */ }
 
 /* ===== Auswahlfeld (Dropdown) ========================================== */
 /* Sieht aus wie ein normales Eingabefeld, nur mit kleinem Pfeil rechts.   */
@@ -586,6 +586,20 @@ a.ib-btn{ text-decoration: none; }   /* Rueckkehr-Knopf ist ein Link */
   line-height: calc(var(--ib-box-h) - 1.5pt);
   color: var(--ib-txt-in);
   padding-left: 1.08pt;
+}
+/* .ib-lbl--fill's "background" shorthand (oben) loescht sonst den
+   Dropdown-Pfeil von .ib-sel wieder - hier gezielt wiederherstellen. */
+select.ib-lbl--fill.ib-sel{
+  background-color: var(--ib-fill);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ib-txt-in) 50%),
+    linear-gradient(135deg, var(--ib-txt-in) 50%, transparent 50%);
+  background-position:
+    right 4.6pt top 50%,
+    right 2.4pt top 50%;
+  background-size: 2.2pt 2.2pt, 2.2pt 2.2pt;
+  background-repeat: no-repeat;
+  padding-right: 10pt;
 }
 
 /* ===== Summenzeile (fett, Linie oben + Doppellinie unten) ============== */
@@ -1554,7 +1568,6 @@ a.ib-btn{ text-decoration: none; }   /* Rueckkehr-Knopf ist ein Link */
     Zurück zur Website
   </a>
   <span class="ib-status" id="ib-status" role="status" aria-live="polite"></span>
-  <a href="?admin" style="margin-left:auto;font-size:11px;color:#8a94a3;text-decoration:none;padding:4px 6px" title="Preisliste bearbeiten (Login erforderlich)">Admin ↗</a>
 </div>
 
 <div class="ib-sheets">
@@ -1746,13 +1759,16 @@ a.ib-btn{ text-decoration: none; }   /* Rueckkehr-Knopf ist ein Link */
       </div>
 
       <div class="ib-r ib-r--wide">
-        <div class="ib-lbl">ZVE p.a. (1.-4. Jahr)</div>
-        <div class="ib-f ib-in ib-f--ctr" id="ib-zve-1-4">500.000 €</div>
+        <div class="ib-lbl">ZVE p.a.</div>
+        <div class="ib-f ib-in ib-f--val" id="ib-zve-1-4">500.000 €</div>
       </div>
 
       <div class="ib-r ib-r--wide">
         <div class="ib-lbl">Splitting</div>
-        <div class="ib-f ib-in ib-f--ctr" id="ib-splitting">Ja</div>
+        <select class="ib-f ib-in ib-f--ctr ib-sel" id="ib-splitting">
+          <option>Ja</option>
+          <option>Nein</option>
+        </select>
       </div>
 
       <div class="ib-r ib-r--wide">
@@ -1870,10 +1886,6 @@ a.ib-btn{ text-decoration: none; }   /* Rueckkehr-Knopf ist ein Link */
       <div class="ib-r">
         <div class="ib-lbl">Tilgungszuschuß KFW 261</div>
         <div class="ib-f ib-in ib-f--val" id="ib-kfw-tilgungszuschuss">7.500 €</div>
-      </div>
-      <div class="ib-r">
-        <div class="ib-lbl">KFW Zuschuss (flexibel)</div>
-        <div class="ib-f ib-in ib-f--val" id="ib-kfw-zuschuss-flex">&nbsp;</div>
       </div>
 
     </div>
@@ -2427,7 +2439,15 @@ var IB_PROJEKTE = [
   }
 
   einpassen();
-  if(window.ResizeObserver) new ResizeObserver(einpassen).observe(buehne);
+  if(window.ResizeObserver){
+    var rafAusstehend = false;
+    var beobachter = new ResizeObserver(function(){
+      if(rafAusstehend) return;
+      rafAusstehend = true;
+      requestAnimationFrame(function(){ rafAusstehend = false; einpassen(); });
+    });
+    beobachter.observe(buehne);
+  }
   else window.addEventListener('resize', einpassen);
   window.addEventListener('load', einpassen);
 })();
@@ -3248,10 +3268,19 @@ var IB_ZAEHLDAUER = 550;
       var beitragInstrument = 0;
       if(!ueberschussInTilgung){
         beitragInstrument = Math.max(0, cashflow);
-        /* Zinseszins: bestehender Bestand wird zuerst verzinst, dann kommt
-           die neue Jahreseinzahlung dazu (die selbst erst naechstes Jahr
-           mitverzinst wird). */
-        tilgungsinstrumentBestand = tilgungsinstrumentBestand * (1 + (inputs.kapitalmarktrendite || 0) / 100) + beitragInstrument;
+        /* Der Jahresüberschuss fließt monatlich (nicht als ein Jahresbetrag
+           am Jahresende) ins Instrument, jeder Monatsbeitrag wird ab dann
+           mitverzinst - Standardformel fuer eine nachschuessige monatliche
+           Sparrate (Rentenendwert) plus Verzinsung des Start-Bestands. */
+        var renditeJahr = (inputs.kapitalmarktrendite || 0) / 100;
+        var rMonat = renditeJahr / 12;
+        var monatsBeitrag = beitragInstrument / 12;
+        if(rMonat !== 0){
+          tilgungsinstrumentBestand = tilgungsinstrumentBestand * Math.pow(1 + rMonat, 12) +
+            monatsBeitrag * ((Math.pow(1 + rMonat, 12) - 1) / rMonat);
+        } else {
+          tilgungsinstrumentBestand = tilgungsinstrumentBestand + beitragInstrument;
+        }
         summeEingezahltInstrument += beitragInstrument;
       }
 
@@ -3395,6 +3424,14 @@ var IB_BUNDESLAENDER = [
    ========================================================================= */
 var IB_SUPABASE_URL = 'https://hjujglumumwjmxbmcakf.supabase.co';
 var IB_SUPABASE_KEY = 'sb_publishable_auwdfO8FDX7_MUmk7sBakA_4DWcu-jF';
+/* EIN gemeinsamer Client fuer Rechner UND Admin-Bereich - zwei getrennte
+   createClient()-Aufrufe mit denselben Zugangsdaten liefen bisher parallel
+   und meldeten "Multiple GoTrueClient instances" (siehe Konsole), was in
+   seltenen Faellen sogar zum DataCloneError beim internen Session-Abgleich
+   fuehren konnte. */
+var IB_SUPABASE_CLIENT = (typeof supabase !== 'undefined')
+  ? supabase.createClient(IB_SUPABASE_URL, IB_SUPABASE_KEY)
+  : null;
 
 window.ibSupabaseLaden = function(){
   var selP = document.getElementById('ib-projekt');
@@ -3466,11 +3503,8 @@ window.ibSupabaseLaden = function(){
     einheitWaehlen(zeile);
   });
 
-  if(typeof supabase === 'undefined'){
-    console.error('Supabase-Bibliothek konnte nicht geladen werden (kein Internet?).');
-    return;
-  }
-  var client = supabase.createClient(IB_SUPABASE_URL, IB_SUPABASE_KEY);
+  var client = IB_SUPABASE_CLIENT;
+  if(!client){ console.error('Supabase-Bibliothek konnte nicht geladen werden (kein Internet?).'); return; }
 
   client.from('einheiten').select('*').order('id', { ascending: true }).then(function(res){
     if(res.error){ console.error('Supabase-Fehler:', res.error.message); return; }
@@ -3514,6 +3548,34 @@ window.ibSupabaseLaden = function(){
   function pct2(n){ return (n || 0).toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' %'; }
   function zahl0s(n){ var r = Math.round(n || 0); return (r >= 0 ? '' : '-') + Math.abs(r).toLocaleString('de-DE'); }
 
+  /* Eigene, kleine Zaehl-Animation fuer die Jahrestabelle (Abschnitt 2):
+     nutzt dieselbe Dauer/Kurve wie ibZeige(), aber mit Ganzzahl-Format statt
+     dessen fest verdrahteter 2-Nachkommastellen-Anzeige - die wuerde die
+     schmalen Jahres-Spalten sprengen. Der Hochzaehl-Mechanismus selbst
+     (ibZeige) bleibt dabei unangetastet. */
+  var ibTabelleLaeuft = {};
+  function ibZeigeGanzzahl(el, ziel){
+    if(!el) return;
+    var schluessel = el.dataset.ibKey || (el.dataset.ibKey = 'z' + Math.random().toString(36).slice(2));
+    var start = (ibTabelleLaeuft[schluessel] !== undefined) ? ibTabelleLaeuft[schluessel] : (window.ibZahl(el) || 0);
+    function setze(w){ ibTabelleLaeuft[schluessel] = w; el.textContent = zahl0s(w); }
+    if(!IB_ZAEHLDAUER || !window.requestAnimationFrame ||
+       window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+      setze(ziel); return;
+    }
+    el.classList.add('ib-laeuft');
+    var t0 = null;
+    function schritt(t){
+      if(t0 === null) t0 = t;
+      var p = Math.min(1, (t - t0) / IB_ZAEHLDAUER);
+      var e = 1 - Math.pow(1 - p, 3);
+      setze(start + (ziel - start) * e);
+      if(p < 1) requestAnimationFrame(schritt);
+      else el.classList.remove('ib-laeuft');
+    }
+    requestAnimationFrame(schritt);
+  }
+
   window.ibBerechnen = function(silent){
     var doc = document.querySelector('.ib-doc');
     if(!doc) return;
@@ -3539,7 +3601,7 @@ window.ibSupabaseLaden = function(){
     var altsubstanzPz = Z('ib-altsubstanz-satz');
     var afaAltsubstanzPz = Z('ib-afa-altsubstanz');
     var zve = Z('ib-zve-1-4');
-    var isSplitting = $('ib-splitting') ? /ja/i.test($('ib-splitting').textContent) : true;
+    var isSplitting = $('ib-splitting') ? /ja/i.test($('ib-splitting').value) : true;
     var kiStSatz = Z('ib-kirchensteuer-satz');
     var eigenkapital = Z('ib-eigenkapital');
     var hdNominalzins = Z('ib-hd-nominalzins');
@@ -3548,7 +3610,6 @@ window.ibSupabaseLaden = function(){
     var kfwNominalzins = Z('ib-kfw-nominalzins');
     var kfwTilgung = Z('ib-kfw-tilgung');
     var kfwTilgungszuschuss = Z('ib-kfw-tilgungszuschuss');
-    var kfwZuschussFlex = Z('ib-kfw-zuschuss-flex');
     var modusSondertilgung = !$('ib-wahl-ersatz') || $('ib-wahl-ersatz').getAttribute('aria-checked') !== 'true';
     var kapitalmarktrendite = Z('ib-kapitalmarktrendite');
 
@@ -3577,7 +3638,7 @@ window.ibSupabaseLaden = function(){
     var kaufpreisInklNk = invZw.kaufpreisInklNk;
 
     var fremdkapitalbedarf = Math.max(0, kaufpreisInklNk - eigenkapital);
-    var kapitalbedarfNachZuschuss = Math.max(0, fremdkapitalbedarf - kfwZuschussFlex);
+    var kapitalbedarfNachZuschuss = fremdkapitalbedarf;
     var kredithoeheHaupt = Math.max(0, kapitalbedarfNachZuschuss - kfwKapitalbedarf);
     var summeDarlehen = kredithoeheHaupt + kfwKapitalbedarf;
     var durchschnittszins = summeDarlehen > 0
@@ -3651,7 +3712,7 @@ window.ibSupabaseLaden = function(){
       var zellen = row.querySelectorAll('td.ib-t-v');
       for(var i = 0; i < zellen.length; i++){
         var j = jv[i];
-        if(j) zellen[i].textContent = zahl0s(zeile[1](j));
+        if(j) ibZeigeGanzzahl(zellen[i], zeile[1](j));
         else zellen[i].textContent = '–';
       }
     });
@@ -3814,7 +3875,12 @@ if(window.ibSupabaseLaden) window.ibSupabaseLaden();
     window.parent.postMessage({ type: 'ib-resize', height: h }, '*');
   }
   if('ResizeObserver' in window){
-    new ResizeObserver(hoeheMelden).observe(document.documentElement);
+    var rafAusstehend2 = false;
+    new ResizeObserver(function(){
+      if(rafAusstehend2) return;
+      rafAusstehend2 = true;
+      requestAnimationFrame(function(){ rafAusstehend2 = false; hoeheMelden(); });
+    }).observe(document.documentElement);
   }
   window.addEventListener('load', hoeheMelden);
   window.addEventListener('resize', hoeheMelden);
@@ -3879,9 +3945,7 @@ if(window.ibSupabaseLaden) window.ibSupabaseLaden();
 
 <script>
 (function(){
-  var SUPABASE_URL = 'https://hjujglumumwjmxbmcakf.supabase.co';
-  var SUPABASE_KEY = 'sb_publishable_auwdfO8FDX7_MUmk7sBakA_4DWcu-jF';
-  var client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  var client = IB_SUPABASE_CLIENT;
 
   var FELDER = [
     'id','objektname','typ','bezeichnung','lage','zimmer','wohnflaeche_qm',
@@ -3921,6 +3985,7 @@ if(window.ibSupabaseLaden) window.ibSupabaseLaden();
     var pass = document.getElementById('ai-pass').value;
     var fehlerEl = document.getElementById('ai-login-fehler');
     fehlerEl.textContent = '';
+    if(!client){ fehlerEl.textContent = 'Supabase-Bibliothek konnte nicht geladen werden (kein Internet?).'; return; }
     if(!email || !pass){ fehlerEl.textContent = 'Bitte E-Mail und Passwort eingeben.'; return; }
     client.auth.signInWithPassword({ email: email, password: pass }).then(function(res){
       if(res.error){ fehlerEl.textContent = 'Anmeldung fehlgeschlagen: ' + res.error.message; return; }
@@ -3938,7 +4003,7 @@ if(window.ibSupabaseLaden) window.ibSupabaseLaden();
     document.getElementById('ai-user').textContent = session.user.email;
   }
 
-  client.auth.getSession().then(function(res){
+  if(client) client.auth.getSession().then(function(res){
     if(res.data && res.data.session) zeigeApp(res.data.session);
   });
 
