@@ -157,6 +157,7 @@ table.tbl input:focus, table.tbl select:focus{ background:var(--fill); border-co
       <button class="sl-item" data-view="import">Listen einspielen</button>
       <button class="sl-item" data-view="einstellungen">Grundeinstellungen</button>
       <button class="sl-item" data-view="grenzwerte">Grenzwerte</button>
+      <button class="sl-item" data-view="steuerparameter">Steuerparameter</button>
       <button class="sl-item" data-view="zugaenge">Zugänge</button>
       <button class="sl-item" data-view="protokoll">Protokoll</button>
     </nav>
@@ -256,7 +257,7 @@ table.tbl input:focus, table.tbl select:focus{ background:var(--fill); border-co
       document.getElementById('sf-email').textContent = MEIN_USER.email;
       document.getElementById('rolle-badge').textContent = rolle === 'verwaltung' ? 'Verwaltung' : 'Nur Preislisten';
       if(rolle !== 'verwaltung'){
-        ['einstellungen','grenzwerte','zugaenge','protokoll'].forEach(function(v){
+        ['einstellungen','grenzwerte','steuerparameter','zugaenge','protokoll'].forEach(function(v){
           var el = document.querySelector('.sl-item[data-view="' + v + '"]');
           if(el) el.style.display = 'none';
         });
@@ -279,7 +280,7 @@ table.tbl input:focus, table.tbl select:focus{ background:var(--fill); border-co
 
   var TITEL_JE_VIEW = {
     projekte: 'Projekte', preisliste: 'Preisliste', import: 'Listen einspielen',
-    einstellungen: 'Grundeinstellungen', grenzwerte: 'Grenzwerte',
+    einstellungen: 'Grundeinstellungen', grenzwerte: 'Grenzwerte', steuerparameter: 'Steuerparameter',
     zugaenge: 'Zugänge', protokoll: 'Protokoll'
   };
 
@@ -291,7 +292,7 @@ table.tbl input:focus, table.tbl select:focus{ background:var(--fill); border-co
     });
     document.getElementById('kopf-titel').textContent = TITEL_JE_VIEW[view] || '';
     var render = { projekte: renderProjekte, preisliste: renderPreisliste, import: renderImport,
-      einstellungen: renderEinstellungen, grenzwerte: renderGrenzwerte,
+      einstellungen: renderEinstellungen, grenzwerte: renderGrenzwerte, steuerparameter: renderSteuerparameter,
       zugaenge: renderZugaenge, protokoll: renderProtokoll }[view];
     if(render) render();
   }
@@ -839,6 +840,110 @@ table.tbl input:focus, table.tbl select:focus{ background:var(--fill); border-co
           var fehler = erg.filter(function(r){ return r.error; });
           status(fehler.length ? 'Fehler beim Speichern.' : 'Gespeichert.', fehler.length ? 'fehler' : 'ok');
         });
+      });
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+     STEUERPARAMETER (§32a EStG-Tarif + Soli, pro Steuerjahr)
+     --------------------------------------------------------------------- */
+  var STEUERPARAMETER_FELDER = [
+    ['grenze_1', 'Ende Grundfreibetrag (Zone 1) €'],
+    ['grenze_2', 'Ende Zone 2 €'],
+    ['grenze_3', 'Ende Zone 3 €'],
+    ['grenze_4', 'Ende oberer Proportionalbereich (Zone 4) €'],
+    ['zone2_faktor', 'Zone 2: Faktor'],
+    ['zone2_offset', 'Zone 2: Offset'],
+    ['zone3_faktor', 'Zone 3: Faktor'],
+    ['zone3_offset', 'Zone 3: Offset'],
+    ['zone3_konstante', 'Zone 3: Konstante'],
+    ['zone4_satz', 'Zone 4: Steuersatz (z. B. 0.42)'],
+    ['zone4_abzug', 'Zone 4: Abzugsbetrag'],
+    ['zone5_satz', 'Zone 5 "Reichensteuer": Steuersatz (z. B. 0.45)'],
+    ['zone5_abzug', 'Zone 5: Abzugsbetrag'],
+    ['soli_freigrenze_grund', 'Soli-Freigrenze Grundtabelle €'],
+    ['soli_freigrenze_splitting', 'Soli-Freigrenze Splittingtabelle €'],
+    ['soli_satz', 'Soli-Satz (z. B. 0.055)'],
+    ['soli_milderungssatz', 'Soli-Milderungssatz (z. B. 0.119)']
+  ];
+
+  function renderSteuerparameter(nachricht){
+    var seite = document.getElementById('seite');
+    seite.innerHTML =
+      '<p class="hinweis">Die Konstanten der Einkommensteuer-Formel (§32a EStG) und des Solidaritätszuschlags, jahrgangsweise. Der Rechner nutzt immer automatisch das <b>neueste</b> hier hinterlegte Steuerjahr.</p>' +
+      '<button class="knopf" id="sp-neu">+ Neues Steuerjahr</button>' +
+      '<div id="sp-tabelle" style="margin-top:16px"></div>';
+    document.getElementById('sp-neu').addEventListener('click', function(){ oeffneSteuerjahrForm(null); });
+
+    status('Lade …');
+    client.from('steuerparameter').select('*').order('steuerjahr', { ascending: false }).then(function(res){
+      if(res.error){ status('Fehler: ' + res.error.message, 'fehler'); return; }
+      status(nachricht || '', nachricht ? 'ok' : '');
+      var rows = res.data || [];
+      document.getElementById('sp-tabelle').innerHTML = !rows.length
+        ? '<p class="hinweis">Noch keine Steuerjahre hinterlegt.</p>'
+        : '<table class="tbl"><thead><tr><th>Steuerjahr</th><th>Zuletzt geändert</th><th></th></tr></thead><tbody>' +
+          rows.map(function(r, i){
+            return '<tr><td>' + r.steuerjahr + (i === 0 ? ' <span class="badge badge--sichtbar">aktiv</span>' : '') + '</td>' +
+              '<td>' + new Date(r.updated_at).toLocaleDateString('de-DE') + '</td>' +
+              '<td><button class="knopf knopf--ghost" data-jahr="' + r.steuerjahr + '">Bearbeiten</button></td></tr>';
+          }).join('') + '</tbody></table>';
+      document.querySelectorAll('#sp-tabelle [data-jahr]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var r = rows.filter(function(x){ return String(x.steuerjahr) === btn.dataset.jahr; })[0];
+          oeffneSteuerjahrForm(r);
+        });
+      });
+    });
+  }
+
+  function oeffneSteuerjahrForm(zeile){
+    var neu = !zeile;
+    var vorlage = zeile || (window.IB_STEUERPARAMETER || {});
+    var hg = document.createElement('div');
+    hg.className = 'modal-hg';
+    hg.innerHTML =
+      '<div class="modal">' +
+        '<h2>' + (neu ? 'Neues Steuerjahr' : 'Steuerjahr ' + zeile.steuerjahr + ' bearbeiten') + '</h2>' +
+        '<div class="form-grid">' +
+          '<div><label>Steuerjahr *</label><input class="eingabe" id="sp-steuerjahr" type="number" ' + (neu ? '' : 'readonly') + ' value="' + (zeile ? zeile.steuerjahr : new Date().getFullYear() + 1) + '"></div>' +
+        '</div>' +
+        '<div class="form-grid" style="margin-top:14px">' +
+          STEUERPARAMETER_FELDER.map(function(f){
+            return '<div><label>' + f[1] + '</label><input class="eingabe" data-k="' + f[0] + '" value="' + (vorlage[f[0]] != null ? vorlage[f[0]] : '') + '"></div>';
+          }).join('') +
+        '</div>' +
+        '<div class="fehler" id="sp-fehler"></div>' +
+        '<div class="modal-aktionen">' +
+          '<button class="knopf" id="sp-speichern">Speichern</button>' +
+          '<button class="knopf knopf--ghost" id="sp-abbrechen">Abbrechen</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(hg);
+    document.getElementById('sp-abbrechen').addEventListener('click', function(){ hg.remove(); });
+    hg.addEventListener('click', function(e){ if(e.target === hg) hg.remove(); });
+
+    document.getElementById('sp-speichern').addEventListener('click', function(){
+      var fehlerEl = document.getElementById('sp-fehler');
+      var jahr = Number(document.getElementById('sp-steuerjahr').value);
+      if(!jahr){ fehlerEl.textContent = 'Bitte ein gültiges Steuerjahr eingeben.'; return; }
+      var daten = { steuerjahr: jahr };
+      var unvollstaendig = false;
+      STEUERPARAMETER_FELDER.forEach(function(f){
+        var inp = hg.querySelector('[data-k="' + f[0] + '"]');
+        var n = Number(inp.value);
+        if(inp.value === '' || isNaN(n)) unvollstaendig = true;
+        daten[f[0]] = n;
+      });
+      if(unvollstaendig){ fehlerEl.textContent = 'Bitte alle Felder ausfüllen.'; return; }
+
+      var aufgabe = neu ? client.from('steuerparameter').insert(daten)
+                        : client.from('steuerparameter').update(daten).eq('steuerjahr', zeile.steuerjahr);
+      aufgabe.then(function(res){
+        if(res.error){ fehlerEl.textContent = 'Fehler: ' + res.error.message; return; }
+        hg.remove();
+        protokollEintrag('steuerparameter', neu ? 'insert' : 'update', jahr, daten);
+        renderSteuerparameter('Steuerjahr ' + jahr + ' gespeichert.');
       });
     });
   }
