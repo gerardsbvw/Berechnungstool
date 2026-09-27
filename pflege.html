@@ -431,13 +431,41 @@ table.tbl input:focus, table.tbl select:focus{ background:var(--fill); border-co
 
     var loeschBtn = document.getElementById('pf-loeschen');
     if(loeschBtn) loeschBtn.addEventListener('click', function(){
-      if(!confirm('Projekt "' + projekt.name + '" wirklich löschen? Das geht nur, wenn keine Einheiten mehr zugeordnet sind.')) return;
-      client.from('projekte').delete().eq('id', projekt.id).then(function(res){
-        if(res.error){ document.getElementById('pf-fehler').textContent = 'Fehler: ' + res.error.message; return; }
-        hg.remove();
-        status('Projekt gelöscht.', 'ok');
-        renderProjekte();
-      });
+      var anzahlEinheiten = (projekt.einheiten || []).length;
+      var fehlerEl = document.getElementById('pf-fehler');
+
+      if(anzahlEinheiten === 0){
+        if(!confirm('Projekt "' + projekt.name + '" wirklich löschen?')) return;
+        projektEndgueltigLoeschen(false);
+        return;
+      }
+
+      var eingabe = prompt(
+        'Dieses Projekt hat noch ' + anzahlEinheiten + ' Einheit(en) in der Preisliste. ' +
+        'Um das Projekt SAMT dieser ' + anzahlEinheiten + ' Einheiten unwiderruflich zu löschen, ' +
+        'gib zur Bestätigung den Projektnamen ein:\n\n"' + projekt.name + '"',
+        ''
+      );
+      if(eingabe === null) return;
+      if(eingabe.trim() !== projekt.name){
+        fehlerEl.textContent = 'Eingabe stimmte nicht mit dem Projektnamen überein - nichts wurde gelöscht.';
+        return;
+      }
+      projektEndgueltigLoeschen(true);
+
+      function projektEndgueltigLoeschen(mitEinheiten){
+        status('Lösche …');
+        var ablauf = mitEinheiten
+          ? client.from('einheiten').delete().eq('projekt_id', projekt.id).then(function(){ return client.from('projekte').delete().eq('id', projekt.id); })
+          : client.from('projekte').delete().eq('id', projekt.id);
+        ablauf.then(function(res){
+          if(res.error){ fehlerEl.textContent = 'Fehler: ' + res.error.message; status(''); return; }
+          hg.remove();
+          protokollEintrag('projekte', 'delete', projekt.id, { name: projekt.name, einheiten_mitgeloescht: mitEinheiten ? anzahlEinheiten : 0 });
+          status('Projekt' + (mitEinheiten ? ' samt ' + anzahlEinheiten + ' Einheit(en)' : '') + ' gelöscht.', 'ok');
+          renderProjekte();
+        });
+      }
     });
   }
 
