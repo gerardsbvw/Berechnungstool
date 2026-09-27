@@ -163,6 +163,7 @@ table.tbl input:focus, table.tbl select:focus{ background:var(--fill); border-co
     </nav>
     <div class="sl-fuss">
       <div id="sf-email"></div>
+      <a href="#" id="pw-link" style="display:block;color:#cfd9de;font-size:12px;margin-top:6px">Passwort ändern</a>
       <button class="knopf knopf--ghost" id="logout-btn" style="color:#fff;border-color:rgba(255,255,255,.4)">Abmelden</button>
     </div>
   </div>
@@ -242,6 +243,44 @@ table.tbl input:focus, table.tbl select:focus{ background:var(--fill); border-co
   document.getElementById('logout-btn').addEventListener('click', function(){
     client.auth.signOut().then(function(){ location.reload(); });
   });
+
+  document.getElementById('pw-link').addEventListener('click', function(e){
+    e.preventDefault();
+    oeffnePasswortForm();
+  });
+
+  function oeffnePasswortForm(){
+    var hg = document.createElement('div');
+    hg.className = 'modal-hg';
+    hg.innerHTML =
+      '<div class="modal" style="max-width:380px">' +
+        '<h2>Passwort ändern</h2>' +
+        '<div class="feldgruppe"><label>Neues Passwort</label><input class="eingabe" type="password" id="pw-neu" autocomplete="new-password"></div>' +
+        '<div class="feldgruppe"><label>Neues Passwort wiederholen</label><input class="eingabe" type="password" id="pw-wiederholen" autocomplete="new-password"></div>' +
+        '<div class="fehler" id="pw-fehler"></div>' +
+        '<div class="modal-aktionen">' +
+          '<button class="knopf" id="pw-speichern">Speichern</button>' +
+          '<button class="knopf knopf--ghost" id="pw-abbrechen">Abbrechen</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(hg);
+    document.getElementById('pw-abbrechen').addEventListener('click', function(){ hg.remove(); });
+    hg.addEventListener('click', function(e){ if(e.target === hg) hg.remove(); });
+    document.getElementById('pw-neu').focus();
+
+    document.getElementById('pw-speichern').addEventListener('click', function(){
+      var neu = document.getElementById('pw-neu').value;
+      var wdh = document.getElementById('pw-wiederholen').value;
+      var fehlerEl = document.getElementById('pw-fehler');
+      if(neu.length < 6){ fehlerEl.textContent = 'Mindestens 6 Zeichen.'; return; }
+      if(neu !== wdh){ fehlerEl.textContent = 'Die beiden Eingaben stimmen nicht überein.'; return; }
+      client.auth.updateUser({ password: neu }).then(function(res){
+        if(res.error){ fehlerEl.textContent = 'Fehler: ' + res.error.message; return; }
+        hg.remove();
+        status('Passwort geändert.', 'ok');
+      });
+    });
+  }
 
   function nachLogin(session){
     client.from('user_roles').select('rolle').eq('user_id', session.user.id).then(function(res){
