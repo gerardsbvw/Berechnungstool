@@ -983,20 +983,34 @@ table.tbl input:focus, table.tbl select:focus{ background:var(--fill); border-co
     var seite = document.getElementById('seite');
     seite.innerHTML =
       '<p class="hinweis"><b>Verwaltung</b>: voller Zugriff, inkl. Grenzwerte und Zugänge. <b>Nur Preislisten</b>: darf ausschließlich Projekte und Preislisten pflegen.</p>' +
-      '<p class="hinweis">Neue Person anlegen geht aktuell noch nicht direkt hier (dafür bräuchte es einen zusätzlichen Baustein) - bitte wie gehabt über die Supabase-Oberfläche anlegen, danach hier die Rolle zuweisen.</p>' +
+      '<p class="hinweis">Neue Person anlegen geht aktuell noch nicht direkt hier (dafür bräuchte es einen zusätzlichen Baustein) - bitte wie gehabt über die Supabase-Oberfläche anlegen. Sie taucht danach automatisch hier auf, sobald sie sich einmal angemeldet hat oder direkt über die Nutzerliste in Supabase.</p>' +
       '<div id="zg-tabelle"></div>';
     status('Lade …');
-    client.from('user_roles').select('user_id, rolle, profiles(email)').then(function(res){
-      if(res.error){ status('Fehler: ' + res.error.message, 'fehler'); return; }
+    Promise.all([
+      client.from('profiles').select('id, email'),
+      client.from('user_roles').select('user_id, rolle')
+    ]).then(function(ergebnisse){
+      var profilRes = ergebnisse[0], rollenRes = ergebnisse[1];
+      if(profilRes.error){ status('Fehler: ' + profilRes.error.message, 'fehler'); return; }
+      if(rollenRes.error){ status('Fehler: ' + rollenRes.error.message, 'fehler'); return; }
       status('');
-      var rows = res.data || [];
-      document.getElementById('zg-tabelle').innerHTML =
-        '<table class="tbl"><thead><tr><th>E-Mail</th><th>Rolle</th><th></th></tr></thead><tbody>' +
-        rows.map(function(r){
-          var email = r.profiles ? r.profiles.email : r.user_id;
+      var rollenJeUser = {};
+      (rollenRes.data || []).forEach(function(r){ rollenJeUser[r.user_id] = r.rolle; });
+      var personen = (profilRes.data || []).map(function(p){
+        return { user_id: p.id, email: p.email, rolle: rollenJeUser[p.id] || '' };
+      });
+
+      document.getElementById('zg-tabelle').innerHTML = !personen.length
+        ? '<p class="hinweis">Noch keine Zugänge gefunden.</p>'
+        : '<table class="tbl"><thead><tr><th>E-Mail</th><th>Rolle</th><th></th></tr></thead><tbody>' +
+        personen.map(function(r){
           return '<tr data-user="' + r.user_id + '">' +
-            '<td>' + escHtml(email) + '</td>' +
-            '<td><select data-k="rolle"><option value="verwaltung"' + (r.rolle === 'verwaltung' ? ' selected' : '') + '>Verwaltung</option><option value="preislisten"' + (r.rolle === 'preislisten' ? ' selected' : '') + '>Nur Preislisten</option></select></td>' +
+            '<td>' + escHtml(r.email) + (r.rolle ? '' : ' <span class="badge badge--entwurf">noch keine Rolle</span>') + '</td>' +
+            '<td><select data-k="rolle">' +
+              '<option value=""' + (r.rolle === '' ? ' selected' : '') + '>– keine Rolle –</option>' +
+              '<option value="verwaltung"' + (r.rolle === 'verwaltung' ? ' selected' : '') + '>Verwaltung</option>' +
+              '<option value="preislisten"' + (r.rolle === 'preislisten' ? ' selected' : '') + '>Nur Preislisten</option>' +
+            '</select></td>' +
             '<td><button class="knopf knopf--ghost" data-speichern>Speichern</button></td>' +
           '</tr>';
         }).join('') + '</tbody></table>';
@@ -1004,9 +1018,17 @@ table.tbl input:focus, table.tbl select:focus{ background:var(--fill); border-co
         btn.addEventListener('click', function(){
           var tr = btn.closest('tr');
           var rolle = tr.querySelector('[data-k="rolle"]').value;
-          client.from('user_roles').update({ rolle: rolle }).eq('user_id', tr.dataset.user).then(function(res2){
+          var userId = tr.dataset.user;
+          if(!rolle){
+            client.from('user_roles').delete().eq('user_id', userId).then(function(res2){
+              if(res2.error){ status('Fehler: ' + res2.error.message, 'fehler'); return; }
+              status('Rolle entfernt.', 'ok');
+            });
+            return;
+          }
+          client.from('user_roles').upsert({ user_id: userId, rolle: rolle }).then(function(res2){
             if(res2.error){ status('Fehler: ' + res2.error.message, 'fehler'); return; }
-            status('Rolle aktualisiert.', 'ok');
+            status('Rolle zugewiesen.', 'ok');
           });
         });
       });
