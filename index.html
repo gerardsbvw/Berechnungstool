@@ -1540,7 +1540,7 @@ select.ib-lbl--fill.ib-sel{
 
       <div class="ib-r">
         <div class="ib-lbl">Gesamtfläche</div>
-        <div class="ib-f ib-in ib-f--val" id="ib-gesamtflaeche" style="color:#000">107,8 m²</div>
+        <div class="ib-f ib-in ib-f--val ib-f--m2" id="ib-gesamtflaeche" style="color:#000">107,8 m²</div>
       </div>
 
       <div class="ib-r">
@@ -1619,17 +1619,17 @@ select.ib-lbl--fill.ib-sel{
         <div class="ib-lbl">Kaltmiete p.m./m²</div>
         <div class="ib-f ib-f--val" id="ib-kaltmiete-pm">1.833 €</div>
         <div></div>
-        <div class="ib-f ib-in ib-f--val" id="ib-kaltmiete-qm">17,00 €</div>
+        <div class="ib-f ib-in ib-f--val ib-f--val2" id="ib-kaltmiete-qm">17,00 €</div>
       </div>
 
       <div class="ib-r">
         <div class="ib-lbl">Miete Stellplatz p.m.</div>
-        <div class="ib-f ib-in ib-f--val" id="ib-miete-stellplatz">&nbsp;</div>
+        <div class="ib-f ib-in ib-f--val ib-f--val2" id="ib-miete-stellplatz">&nbsp;</div>
       </div>
 
       <div class="ib-r">
         <div class="ib-lbl">Hausverwaltung p.m.</div>
-        <div class="ib-f ib-in ib-f--val" id="ib-hausverwaltung">63,00 €</div>
+        <div class="ib-f ib-in ib-f--val ib-f--val2" id="ib-hausverwaltung">63,00 €</div>
       </div>
 
       <div class="ib-r">
@@ -1639,7 +1639,7 @@ select.ib-lbl--fill.ib-sel{
 
       <div class="ib-r">
         <div class="ib-lbl">Rücklage p.a.</div>
-        <div class="ib-f ib-in ib-f--val" id="ib-ruecklage">765,66 €</div>
+        <div class="ib-f ib-in ib-f--val ib-f--val2" id="ib-ruecklage">765,66 €</div>
       </div>
 
       <div class="ib-r ib-r--spacer"></div>
@@ -2915,7 +2915,9 @@ var IB_ZAEHLDAUER = 550;
   /* ---- 2. Hochzaehlen -------------------------------------------------- */
   var laeuft = {};
 
-  function euro(z){ return z.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
+  function euro(z){ return Math.round(z).toLocaleString('de-DE') + ' €'; }
+  function euro2(z){ return z.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
+  function m2(z){ return z.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + ' m²'; }
   function prozent(z){ return z.toFixed(1).replace('.', ',') + ' %'; }
   function prozent2(z){ return z.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' %'; }
   function zahl(z){ return z.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -2923,7 +2925,7 @@ var IB_ZAEHLDAUER = 550;
   window.ibZeige = function(id, ziel, art){
     var el = (typeof id === 'string') ? document.getElementById(id) : id;
     if(!el) return;
-    var form = (art === 'prozent') ? prozent : (art === 'prozent2') ? prozent2 : (art === 'zahl' ? zahl : euro);
+    var form = (art === 'prozent') ? prozent : (art === 'prozent2') ? prozent2 : (art === 'euro2') ? euro2 : (art === 'zahl' ? zahl : euro);
     var schluessel = el.id || (el.id = 'ib-auto-' + Math.random().toString(36).slice(2));
     var start = (laeuft[schluessel] !== undefined) ? laeuft[schluessel] : window.ibZahl(el);
 
@@ -2952,7 +2954,9 @@ var IB_ZAEHLDAUER = 550;
     var el = e.target;
     if(!el.getAttribute || el.getAttribute('contenteditable') !== 'true') return;
     var z = window.ibZahl(el);
-    if(el.classList.contains('ib-f--pct2'))     el.textContent = prozent2(z);
+    if(el.classList.contains('ib-f--m2'))       el.textContent = m2(z);
+    else if(el.classList.contains('ib-f--val2')) el.textContent = euro2(z);
+    else if(el.classList.contains('ib-f--pct2')) el.textContent = prozent2(z);
     else if(el.classList.contains('ib-f--pct')) el.textContent = prozent(z);
     else if(el.classList.contains('ib-f--val')) el.textContent = euro(z);
     laeuft[el.id] = z;
@@ -3415,7 +3419,7 @@ window.ibSupabaseLaden = function(){
   function eur0(n){ return Math.round(n).toLocaleString('de-DE') + ' €'; }
   function eur2(n){ return n.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €'; }
   function pct1(n){ return n.toLocaleString('de-DE', {minimumFractionDigits:1, maximumFractionDigits:1}) + ' %'; }
-  function m2(n){ return n.toLocaleString('de-DE', {minimumFractionDigits:1, maximumFractionDigits:1}) + ' m²'; }
+  function m2(n){ return n.toLocaleString('de-DE', {minimumFractionDigits:1, maximumFractionDigits:2}) + ' m²'; }
   function setText(id, txt){ var el = document.getElementById(id); if(el) el.textContent = txt; }
 
   var GRUPPEN = {}, REIHENFOLGE = [];
@@ -3436,7 +3440,7 @@ window.ibSupabaseLaden = function(){
     if(zeile.kaufpreis_einheit != null) setText('ib-kaufpreis-einheit', eur0(zeile.kaufpreis_einheit));
     setText('ib-kaufpreis-stellplatz', zeile.stellplatz_kaufpreis != null ? eur0(zeile.stellplatz_kaufpreis) : '\u00a0');
     if(zeile.kaltmiete_je_qm != null) setText('ib-kaltmiete-qm', eur2(zeile.kaltmiete_je_qm));
-    setText('ib-miete-stellplatz', zeile.stellplatz_miete_pm != null ? eur0(zeile.stellplatz_miete_pm) : '');
+    setText('ib-miete-stellplatz', zeile.stellplatz_miete_pm != null ? eur2(zeile.stellplatz_miete_pm) : '');
     if(zeile.hausverwaltung_pm != null) setText('ib-hausverwaltung', eur2(zeile.hausverwaltung_pm));
     window.IB_RUECKLAGE_MANUELL = false; /* neue Einheit -> Ruecklage wieder per Formel Flaeche x €/m² */
     if(projekt.wertsteigerung_pa_pz != null) setText('ib-wertsteigerung', pct1(projekt.wertsteigerung_pa_pz));
@@ -3574,7 +3578,7 @@ window.ibSupabaseLaden = function(){
        solange das Feld nicht manuell ueberschrieben wurde. */
     if(!window.IB_RUECKLAGE_MANUELL){
       var rlFeld = $('ib-ruecklage');
-      if(rlFeld) ibZeige(rlFeld, flaeche * (window.IB_RUECKLAGE_JE_QM != null ? window.IB_RUECKLAGE_JE_QM : 7.10));
+      if(rlFeld) ibZeige(rlFeld, flaeche * (window.IB_RUECKLAGE_JE_QM != null ? window.IB_RUECKLAGE_JE_QM : 7.10), 'euro2');
     }
     var ruecklagePa = Z('ib-ruecklage');
     var bodenanteilPz = Z('ib-bodenanteil-satz');
@@ -3869,7 +3873,7 @@ if(IB_SUPABASE_CLIENT){
   function eur2(n){ return n.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €'; }
   function pct1(n){ return n.toLocaleString('de-DE', {minimumFractionDigits:1, maximumFractionDigits:1}) + ' %'; }
   function pct2(n){ return n.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' %'; }
-  function m2(n){ return n.toLocaleString('de-DE', {minimumFractionDigits:1, maximumFractionDigits:1}) + ' m²'; }
+  function m2(n){ return n.toLocaleString('de-DE', {minimumFractionDigits:1, maximumFractionDigits:2}) + ' m²'; }
   function setText(id, txt){ var el = document.getElementById(id); if(el) el.textContent = txt; }
 
   /* ---------- Grundeinstellungen: Standardwerte beim Laden ---------- */
@@ -3881,10 +3885,10 @@ if(IB_SUPABASE_CLIENT){
     hd_tilgung:            { id: 'ib-hd-tilgung',            fmt: pct2 },
     kfw_nominalzins:       { id: 'ib-kfw-nominalzins',       fmt: pct2 },
     kfw_tilgung:           { id: 'ib-kfw-tilgung',           fmt: pct2 },
-    kfw_kapitalbedarf:     { id: 'ib-kfw-kapitalbedarf',     fmt: eur2 },
-    kfw_tilgungszuschuss:  { id: 'ib-kfw-tilgungszuschuss',  fmt: eur2 },
+    kfw_kapitalbedarf:     { id: 'ib-kfw-kapitalbedarf',     fmt: eur0 },
+    kfw_tilgungszuschuss:  { id: 'ib-kfw-tilgungszuschuss',  fmt: eur0 },
     kapitalmarktrendite:   { id: 'ib-kapitalmarktrendite',   fmt: pct2 },
-    zve_standard:          { id: 'ib-zve-1-4',               fmt: eur2 },
+    zve_standard:          { id: 'ib-zve-1-4',               fmt: eur0 },
     ruecklage_je_qm:       { id: null, fmt: null }
   };
 
