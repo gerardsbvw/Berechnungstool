@@ -1757,11 +1757,11 @@ select.ib-lbl--fill.ib-sel{
       </div>
       <div class="ib-r">
         <div class="ib-lbl">Nominalzins</div>
-        <div class="ib-f ib-in ib-f--pct" id="ib-hd-nominalzins">4,30 %</div>
+        <div class="ib-f ib-in ib-f--pct ib-f--pct2" id="ib-hd-nominalzins">4,30 %</div>
       </div>
       <div class="ib-r">
         <div class="ib-lbl">Anfängliche Tilgung</div>
-        <div class="ib-f ib-in ib-f--pct" id="ib-hd-tilgung">1,5 %</div>
+        <div class="ib-f ib-in ib-f--pct ib-f--pct2" id="ib-hd-tilgung">1,50 %</div>
       </div>
       <div class="ib-r">
         <div class="ib-lbl ib-lbl--0">Durchschnittszins inkl. KFW</div>
@@ -1812,11 +1812,11 @@ select.ib-lbl--fill.ib-sel{
       </div>
       <div class="ib-r">
         <div class="ib-lbl">Nominalzins</div>
-        <div class="ib-f ib-in ib-f--pct" id="ib-kfw-nominalzins">2,80 %</div>
+        <div class="ib-f ib-in ib-f--pct ib-f--pct2" id="ib-kfw-nominalzins">2,80 %</div>
       </div>
       <div class="ib-r">
         <div class="ib-lbl">Anfängliche Tilgung</div>
-        <div class="ib-f ib-in ib-f--pct" id="ib-kfw-tilgung">1,5 %</div>
+        <div class="ib-f ib-in ib-f--pct ib-f--pct2" id="ib-kfw-tilgung">1,50 %</div>
       </div>
       <div class="ib-r">
         <div class="ib-lbl">Tilgungszuschuß KFW 261</div>
@@ -2683,6 +2683,7 @@ window.ibRenderPie(IB_ERGEBNIS);
       if(selKircheR && window.IB_STARTWERTE['ib-kirchensteuer-label'] != null) selKircheR.selectedIndex = window.IB_STARTWERTE['ib-kirchensteuer-label'];
       if(selKircheR) selKircheR.dispatchEvent(new Event('change', { bubbles: true }));
     }
+    window.IB_RUECKLAGE_MANUELL = false;
     window.ibBerechnen();
     melden('Auf Ausgangswerte zurückgesetzt');
   });
@@ -2914,14 +2915,15 @@ var IB_ZAEHLDAUER = 550;
   /* ---- 2. Hochzaehlen -------------------------------------------------- */
   var laeuft = {};
 
-  function euro(z){ return Math.round(z).toLocaleString('de-DE') + ' €'; }
+  function euro(z){ return z.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
   function prozent(z){ return z.toFixed(1).replace('.', ',') + ' %'; }
+  function prozent2(z){ return z.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' %'; }
   function zahl(z){ return z.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
   window.ibZeige = function(id, ziel, art){
     var el = (typeof id === 'string') ? document.getElementById(id) : id;
     if(!el) return;
-    var form = (art === 'prozent') ? prozent : (art === 'zahl' ? zahl : euro);
+    var form = (art === 'prozent') ? prozent : (art === 'prozent2') ? prozent2 : (art === 'zahl' ? zahl : euro);
     var schluessel = el.id || (el.id = 'ib-auto-' + Math.random().toString(36).slice(2));
     var start = (laeuft[schluessel] !== undefined) ? laeuft[schluessel] : window.ibZahl(el);
 
@@ -2950,7 +2952,8 @@ var IB_ZAEHLDAUER = 550;
     var el = e.target;
     if(!el.getAttribute || el.getAttribute('contenteditable') !== 'true') return;
     var z = window.ibZahl(el);
-    if(el.classList.contains('ib-f--pct'))      el.textContent = prozent(z);
+    if(el.classList.contains('ib-f--pct2'))     el.textContent = prozent2(z);
+    else if(el.classList.contains('ib-f--pct')) el.textContent = prozent(z);
     else if(el.classList.contains('ib-f--val')) el.textContent = euro(z);
     laeuft[el.id] = z;
   });
@@ -2973,6 +2976,15 @@ var IB_ZAEHLDAUER = 550;
   /* Fallback (2026), falls die Datenbank nicht erreichbar ist - wird bei
      Verbindung sofort durch den aktuellsten Datenbank-Stand ersetzt
      (siehe ibSteuerparameterLaden weiter unten). */
+  window.IB_RUECKLAGE_JE_QM = 7.10;  /* Fallback, ueberschreibbar per Grundeinstellungen */
+  window.IB_RUECKLAGE_MANUELL = false;
+  /* Unbedingt registriert (nicht von einer Datenbankverbindung abhaengig) -
+     Capture-Phase, damit es vor dem weiter oben bereits bestehenden
+     Neuberechnen-Ausloeser (Bubble-Phase) laeuft. */
+  document.addEventListener('focusout', function(e){
+    if(e.target && e.target.id === 'ib-ruecklage') window.IB_RUECKLAGE_MANUELL = true;
+  }, true);
+
   window.IB_STEUERPARAMETER = {
     steuerjahr: 2026,
     grenze_1: 12348, grenze_2: 17799, grenze_3: 69878, grenze_4: 277825,
@@ -3426,6 +3438,7 @@ window.ibSupabaseLaden = function(){
     if(zeile.kaltmiete_je_qm != null) setText('ib-kaltmiete-qm', eur2(zeile.kaltmiete_je_qm));
     setText('ib-miete-stellplatz', zeile.stellplatz_miete_pm != null ? eur0(zeile.stellplatz_miete_pm) : '');
     if(zeile.hausverwaltung_pm != null) setText('ib-hausverwaltung', eur2(zeile.hausverwaltung_pm));
+    window.IB_RUECKLAGE_MANUELL = false; /* neue Einheit -> Ruecklage wieder per Formel Flaeche x €/m² */
     if(projekt.wertsteigerung_pa_pz != null) setText('ib-wertsteigerung', pct1(projekt.wertsteigerung_pa_pz));
     if(projekt.mietsteigerung_pa_pz != null) setText('ib-mietsteigerung', pct1(projekt.mietsteigerung_pa_pz));
     if(zeile.bodenanteil_pz != null) setText('ib-bodenanteil-satz', pct1(zeile.bodenanteil_pz));
@@ -3557,6 +3570,12 @@ window.ibSupabaseLaden = function(){
     var stellplatzMiete = Z('ib-miete-stellplatz');
     var hausverwaltungPm = Z('ib-hausverwaltung');
     var mietsteigerung = Z('ib-mietsteigerung');
+    /* Ruecklage p.a. = Flaeche x €/m² (Satz in Grundeinstellungen pflegbar),
+       solange das Feld nicht manuell ueberschrieben wurde. */
+    if(!window.IB_RUECKLAGE_MANUELL){
+      var rlFeld = $('ib-ruecklage');
+      if(rlFeld) ibZeige(rlFeld, flaeche * (window.IB_RUECKLAGE_JE_QM != null ? window.IB_RUECKLAGE_JE_QM : 7.10));
+    }
     var ruecklagePa = Z('ib-ruecklage');
     var bodenanteilPz = Z('ib-bodenanteil-satz');
     var altsubstanzPz = Z('ib-altsubstanz-satz');
@@ -3643,7 +3662,7 @@ window.ibSupabaseLaden = function(){
 
     ibZeige('ib-fremdkapitalbedarf', fremdkapitalbedarf);
     ibZeige('ib-kredithoehe', kredithoeheHaupt);
-    ibZeige('ib-durchschnittszins', durchschnittszins, 'prozent');
+    ibZeige('ib-durchschnittszins', durchschnittszins, 'prozent2');
 
     /* ---------- Abschnitt 2: 12-Jahres-Tabelle ---------- */
     var ZEILEN = [
@@ -3721,7 +3740,7 @@ window.ibSupabaseLaden = function(){
 
     setDirekt('ib-l-miete', '+' + eur0(mMiete));
     setDirekt('ib-l-steuerersparnis', (mSteuerersparnis >= 0 ? '+' : '-') + eur0(Math.abs(mSteuerersparnis)));
-    ibZeige('ib-l-zinssatz', durchschnittszins, 'prozent');
+    ibZeige('ib-l-zinssatz', durchschnittszins, 'prozent2');
     setDirekt('ib-l-zinsen', '-' + eur0(mZins));
     setDirekt('ib-l-tilgung', '-' + eur0(mTilgung));
     setDirekt('ib-l-instandhaltung', '-' + eur0(mInstandhaltung));
@@ -3835,6 +3854,125 @@ if(IB_SUPABASE_CLIENT){
       if(window.ibBerechnen) window.ibBerechnen(true);
     });
 }
+
+/* =========================================================================
+   GRUNDEINSTELLUNGEN (Standardwerte) + GRENZWERTE (Eingrenzungswerte)
+   -------------------------------------------------------------------------
+   Beide werden im Adminbereich (pflege.html) gepflegt. Grundeinstellungen
+   ueberschreiben beim Laden die im HTML fest hinterlegten Platzhalter-
+   werte; Grenzwerte greifen laufend, sobald ein Feld verlassen wird.
+   ========================================================================= */
+(function(){
+  if(!IB_SUPABASE_CLIENT) return;
+
+  function eur0(n){ return Math.round(n).toLocaleString('de-DE') + ' €'; }
+  function eur2(n){ return n.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €'; }
+  function pct1(n){ return n.toLocaleString('de-DE', {minimumFractionDigits:1, maximumFractionDigits:1}) + ' %'; }
+  function pct2(n){ return n.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' %'; }
+  function m2(n){ return n.toLocaleString('de-DE', {minimumFractionDigits:1, maximumFractionDigits:1}) + ' m²'; }
+  function setText(id, txt){ var el = document.getElementById(id); if(el) el.textContent = txt; }
+
+  /* ---------- Grundeinstellungen: Standardwerte beim Laden ---------- */
+  var GRUNDEINSTELLUNG_ZIEL = {
+    notarkosten_pz:        { id: 'ib-notarkosten-satz',      fmt: pct1 },
+    beratungshonorar_pz:   { id: 'ib-beratungshonorar-satz', fmt: pct1 },
+    bauzeitzinsen_pz:      { id: 'ib-bauzeitzinsen-satz',    fmt: pct1 },
+    hd_nominalzins:        { id: 'ib-hd-nominalzins',        fmt: pct2 },
+    hd_tilgung:            { id: 'ib-hd-tilgung',            fmt: pct2 },
+    kfw_nominalzins:       { id: 'ib-kfw-nominalzins',       fmt: pct2 },
+    kfw_tilgung:           { id: 'ib-kfw-tilgung',           fmt: pct2 },
+    kfw_kapitalbedarf:     { id: 'ib-kfw-kapitalbedarf',     fmt: eur2 },
+    kfw_tilgungszuschuss:  { id: 'ib-kfw-tilgungszuschuss',  fmt: eur2 },
+    kapitalmarktrendite:   { id: 'ib-kapitalmarktrendite',   fmt: pct2 },
+    zve_standard:          { id: 'ib-zve-1-4',               fmt: eur2 },
+    ruecklage_je_qm:       { id: null, fmt: null }
+  };
+
+  IB_SUPABASE_CLIENT.from('einstellungen').select('*').then(function(res){
+    if(res.error || !res.data) return;
+    var werte = {};
+    res.data.forEach(function(r){ werte[r.schluessel] = r.wert; });
+
+    Object.keys(GRUNDEINSTELLUNG_ZIEL).forEach(function(schluessel){
+      if(werte[schluessel] == null) return;
+      var ziel = GRUNDEINSTELLUNG_ZIEL[schluessel];
+      var n = Number(werte[schluessel]);
+      if(isNaN(n)) return;
+      if(!ziel.id) return; /* z.B. ruecklage_je_qm - kein eigenes Anzeigefeld */
+      setText(ziel.id, ziel.fmt(n));
+    });
+    if(werte.ruecklage_je_qm != null){
+      var rlRate = Number(werte.ruecklage_je_qm);
+      if(!isNaN(rlRate)) window.IB_RUECKLAGE_JE_QM = rlRate;
+    }
+    if(werte.splitting_standard){
+      var selSplit = document.getElementById('ib-splitting');
+      if(selSplit) selSplit.value = werte.splitting_standard;
+    }
+    if(werte.kirchensteuer_standard){
+      var selKirche = document.getElementById('ib-kirchensteuer-label');
+      if(selKirche){
+        for(var i = 0; i < selKirche.options.length; i++){
+          if(selKirche.options[i].value === werte.kirchensteuer_standard){ selKirche.selectedIndex = i; break; }
+        }
+      }
+    }
+    if(window.ibBerechnen) window.ibBerechnen(true);
+  });
+
+  /* ---------- Grenzwerte: laufende Pruefung beim Verlassen eines Feldes ---------- */
+  var GRENZWERT_ZIEL = {
+    kaufpreis_einheit:  { id: 'ib-kaufpreis-einheit', fmt: eur0, bez: 'Kaufpreis Einheit' },
+    wohnflaeche_qm:     { id: 'ib-gesamtflaeche',      fmt: m2,   bez: 'Gesamtfläche' },
+    kaltmiete_je_qm:    { id: 'ib-kaltmiete-qm',       fmt: eur2, bez: 'Kaltmiete je m²' },
+    hausverwaltung_pm:  { id: 'ib-hausverwaltung',     fmt: eur2, bez: 'Hausverwaltung p.m.' },
+    wertsteigerung_pa_pz:{ id: 'ib-wertsteigerung',    fmt: pct1, bez: 'Wertsteigerung p.a.' },
+    mietsteigerung_pa_pz:{ id: 'ib-mietsteigerung',    fmt: pct1, bez: 'Mietsteigerung p.a.' },
+    bodenanteil_pz:     { id: 'ib-bodenanteil-satz',   fmt: pct1, bez: 'Bodenanteil' },
+    altsubstanz_pz:     { id: 'ib-altsubstanz-satz',   fmt: pct1, bez: 'Altsubstanz' }
+  };
+  var GRENZWERTE_JE_ID = {};
+
+  IB_SUPABASE_CLIENT.from('grenzwerte').select('*').then(function(res){
+    if(res.error || !res.data) return;
+    res.data.forEach(function(g){
+      var ziel = GRENZWERT_ZIEL[g.feld];
+      if(ziel) GRENZWERTE_JE_ID[ziel.id] = Object.assign({}, g, ziel);
+    });
+  });
+
+  function hinweisZeigen(text){
+    var el = document.getElementById('ib-status');
+    if(!el) return;
+    el.textContent = text;
+    el.classList.add('ib-status--an');
+    clearTimeout(hinweisZeigen._t);
+    hinweisZeigen._t = setTimeout(function(){ el.classList.remove('ib-status--an'); }, 3200);
+  }
+
+  document.addEventListener('focusout', function(e){
+    var el = e.target;
+    var g = el.id && GRENZWERTE_JE_ID[el.id];
+    if(!g) return;
+    var wert = window.ibZahl(el);
+    var korrigiert = wert;
+    var ausserhalb = false;
+    if(g.min_wert != null && wert < g.min_wert){ korrigiert = g.min_wert; ausserhalb = true; }
+    if(g.max_wert != null && wert > g.max_wert){ korrigiert = g.max_wert; ausserhalb = true; }
+    if(!ausserhalb) return;
+
+    if(g.verhalten === 'hart'){
+      el.textContent = g.fmt(korrigiert);
+      hinweisZeigen(g.bez + ' auf den zulässigen Bereich (' + g.min_wert + '–' + g.max_wert + ') begrenzt.');
+      if(window.ibBerechnen) window.ibBerechnen();
+    } else {
+      hinweisZeigen('Hinweis: ' + g.bez + ' liegt außerhalb des üblichen Bereichs (' + g.min_wert + '–' + g.max_wert + ').');
+    }
+  }); /* normale Bubble-Phase: laeuft dank spaeterer Registrierung im Skript
+         zuverlaessig NACH der bestehenden Reformatierung, statt Gefahr zu
+         laufen, von ihr wieder ueberschrieben zu werden. */
+})();
+
 
 </script>
 
